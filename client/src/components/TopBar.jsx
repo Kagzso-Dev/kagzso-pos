@@ -63,28 +63,20 @@ const TopBar = memo(({ onMenuClick, sidebarCollapsed }) => {
                                 <button
                                     onClick={() => navigate('/admin/tables')}
                                     title="Table Map"
-                                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all duration-200 border border-blue-500/20 active:scale-95 shadow-sm"
+                                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-500/10 text-white hover:bg-blue-500 hover:text-white transition-all duration-200 border border-blue-500/30 active:scale-95 shadow-sm"
                                 >
                                     <Armchair size={18} />
                                 </button>
                                 <button
                                     onClick={() => navigate('/admin/settings')}
                                     title="Settings"
-                                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition-all duration-200 border border-orange-500/20 active:scale-95 shadow-sm"
+                                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-orange-500/10 text-white hover:bg-orange-500 hover:text-white transition-all duration-200 border border-orange-500/30 active:scale-95 shadow-sm"
                                 >
                                     <Settings size={18} />
                                 </button>
                             </>
                         )}
  
-                        {/* Sign Out — Hidden on mobile to avoid duplication with page-specific actions */}
-                        <button
-                            onClick={handleLogout}
-                            title="Sign Out"
-                            className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200 border border-red-500/20 active:scale-95 shadow-sm"
-                        >
-                            <LogOut size={18} />
-                        </button>
                     </div>
                 </div>
             </div>

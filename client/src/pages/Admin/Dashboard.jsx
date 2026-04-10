@@ -298,7 +298,7 @@ const AdminDashboard = () => {
                 <div>
                     <h1 className="text-xl sm:text-2xl font-black text-[var(--theme-text-main)] uppercase tracking-tighter leading-tight flex items-center">
                         KAGZSO
-                        <span className="text-black font-black ml-2 text-xs sm:text-base uppercase tracking-widest px-2 py-0.5 bg-[var(--theme-bg-dark)] rounded-lg border border-[var(--theme-border)] shadow-inner">
+                        <span className="text-white font-black ml-2 text-xs sm:text-base uppercase tracking-widest px-2 py-0.5 bg-[var(--theme-bg-dark)] rounded-lg border border-[var(--theme-border)] shadow-inner">
                             Analytics
                         </span>
                     </h1>

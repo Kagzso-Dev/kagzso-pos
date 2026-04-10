@@ -45,11 +45,21 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
     };
 
     /* ── NavItem ─────────────────────────────────────────────────────── */
-    const NavItem = ({ to, icon: Icon, label, color = 'text-[var(--theme-text-muted)]', badge }) => {
-        const active = isActive(to);
+    const NavItem = ({ to, onClick, icon: Icon, label, color = 'text-[var(--theme-text-muted)]', badge }) => {
+        const active = to ? isActive(to) : false;
+        
+        const handleClick = () => {
+            if (onClick) {
+                onClick();
+                if (onClose) onClose();
+            } else if (to) {
+                handleNav(to);
+            }
+        };
+
         return (
             <button
-                onClick={() => handleNav(to)}
+                onClick={handleClick}
                 title={collapsed ? label : undefined}
                 className={`
                     w-full flex items-center rounded-xl transition-all duration-300 group relative tap-scale overflow-hidden
@@ -66,7 +76,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                 )}
                 <Icon
                     size={20}
-                    className={`flex-shrink-0 transition-all duration-300 ${active ? 'text-orange-400 scale-110' : color} group-hover:text-orange-400`}
+                    className={`flex-shrink-0 transition-all duration-300 ${active ? 'text-white scale-110' : color} group-hover:text-white`}
                 />
                 {!collapsed && (
                     <span className="font-bold text-[13px] tracking-tight truncate uppercase">{label}</span>
@@ -220,22 +230,19 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                     </>
                 )}
 
-                {/* Logout shortcut – only for specific roles as requested. Hidden on md+ to avoid duplication with TopBar */}
-                {['admin', 'cashier', 'kitchen'].includes(user.role) && (
-                    <div className="md:hidden mt-8 pt-10 border-t border-[var(--theme-border)]">
-                        <SectionLabel>Session</SectionLabel>
-                        <NavItem 
-                            to="/logout" 
-                            icon={LogOut} 
-                            label="Sign Out" 
-                            color="text-rose-500" 
-                        />
-                    </div>
-                )}
-
                 {/* Theme Selector - Bottom of Nav */}
-                <div className={`mt-auto pt-6 border-t border-[var(--theme-border)] ${collapsed ? 'px-0' : 'px-2'}`}>
+                <div className={`mt-auto pt-4 border-t border-[var(--theme-border)] ${collapsed ? 'px-0' : 'px-2'}`}>
                      <ThemeSwitcher collapsed={collapsed} />
+                </div>
+
+                {/* RELOCATED: Logout button - Always visible for all devices and roles */}
+                <div className="mt-2 mb-2 px-1">
+                    <NavItem 
+                        onClick={handleLogout} 
+                        icon={LogOut} 
+                        label="Sign Out" 
+                        color="text-rose-500" 
+                    />
                 </div>
             </nav>
 

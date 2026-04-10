@@ -568,9 +568,6 @@ const WaiterDashboard = () => {
                                     <Armchair size={15} strokeWidth={2.5} />
                                 </button>
                             )}
-                            <button onClick={() => navigate('/logout')} className="w-8 h-8 flex items-center justify-center rounded-lg border border-rose-500/30 bg-rose-500/5 text-rose-500 transition-all active:scale-95 font-bold">
-                                <LogOut size={14} strokeWidth={2.5} />
-                            </button>
                         </div>
                     </div>
 
