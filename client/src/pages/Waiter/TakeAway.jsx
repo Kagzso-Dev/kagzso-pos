@@ -364,7 +364,7 @@ const TakeAway = () => {
                         {/* Scrollable items */}
                         <div className="flex-1 kot-scroll px-4 py-4 space-y-3 custom-scrollbar">
                             {cart.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center text-gray-700 py-10">
+                                <div className="flex flex-col items-center justify-center text-[var(--theme-text-muted)] py-10">
                                     <ShoppingCart size={64} className="mb-4 opacity-5" strokeWidth={1} />
                                     <p className="font-bold">Your cart is empty</p>
                                     <p className="text-xs">Add items from the menu to build your order</p>

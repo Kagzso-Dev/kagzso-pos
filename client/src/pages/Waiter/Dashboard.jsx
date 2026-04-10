@@ -703,7 +703,13 @@ const WaiterDashboard = () => {
                             </button>
                         </div>
                         <div className="overflow-y-auto p-4 sm:p-5 flex-1">
-                            <TableGrid allowedStatuses={['available']} showCleanAction={true} onReserve={handleReserveTable} onCancelReservation={handleCancelReservation} />
+                            <TableGrid 
+                                allowedStatuses={['available', 'occupied', 'reserved']} 
+                                filterByAllowedStatuses={false}
+                                showCleanAction={true} 
+                                onReserve={handleReserveTable} 
+                                onCancelReservation={handleCancelReservation} 
+                            />
                         </div>
                     </div>
                 </div>,

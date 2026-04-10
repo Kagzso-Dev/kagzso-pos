@@ -246,10 +246,19 @@ const DineIn = () => {
                         style={{ overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' }}
                     >
                         <TableGrid
-                            allowedStatuses={['available']}
-                            filterByAllowedStatuses={true}
+                            allowedStatuses={['available', 'occupied', 'reserved']}
+                            filterByAllowedStatuses={false}
                             showCleanAction={true}
-                            onSelectTable={(table) => { setSelectedTable(table); setStep(3); }}
+                            onSelectTable={(table) => {
+                                if (table.status === 'occupied' && table.currentOrderId) {
+                                    setExistingOrderId(table.currentOrderId);
+                                    setIsAddingItems(true);
+                                    setStep(3);
+                                } else {
+                                    setSelectedTable(table);
+                                    setStep(3);
+                                }
+                            }}
                         />
                     </div>
                 </div>
@@ -359,7 +368,7 @@ const DineIn = () => {
                                 style={{ overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' }}
                             >
                                 {filteredItems.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 text-gray-600">
+                                    <div className="flex flex-col items-center justify-center h-64 text-[var(--theme-text-muted)]">
                                         <SearchX size={48} className="mb-4 opacity-10" />
                                         <p className="font-medium text-lg">No items found</p>
                                     </div>
@@ -402,11 +411,11 @@ const DineIn = () => {
 
                         <div className="relative h-full w-full bg-[var(--theme-bg-card)] flex flex-col overflow-hidden">
                             {/* Header */}
-                            <div className="px-5 py-4 border-b border-[var(--theme-border)] flex items-center justify-between flex-shrink-0 bg-white">
+                            <div className="px-5 py-4 border-b border-[var(--theme-border)] flex items-center justify-between flex-shrink-0 bg-[var(--theme-bg-card)]">
                                 <div className="flex items-center gap-3">
                                     <button 
                                         onClick={() => setIsCartOpen(false)} 
-                                        className="md:hidden w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-100 transition-all border border-gray-100"
+                                        className="md:hidden w-10 h-10 flex items-center justify-center bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] rounded-xl hover:bg-[var(--theme-bg-hover)] transition-all border border-[var(--theme-border)]"
                                     >
                                         <ArrowLeft size={18} />
                                     </button>
