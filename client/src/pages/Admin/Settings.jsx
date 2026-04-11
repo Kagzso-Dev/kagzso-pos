@@ -226,7 +226,7 @@ const Settings = () => {
     useEffect(() => {
         if (settings) {
             setQrUrls({
-                standardQrUrl:  settings.standardQrUrl  || null,
+                standardQrUrl: settings.standardQrUrl || null,
                 secondaryQrUrl: settings.secondaryQrUrl || null,
             });
         }
@@ -251,7 +251,7 @@ const Settings = () => {
         try {
             await api.put('/api/settings', generalConfig, { headers: { Authorization: `Bearer ${user.token}` } });
             // Update context state immediately from response
-            if (fetchSettings) await fetchSettings(); 
+            if (fetchSettings) await fetchSettings();
             setMsg(key, 'success', 'Saved successfully');
         } catch (err) {
             setMsg(key, 'error', err.response?.data?.message || 'Save failed');
@@ -366,7 +366,7 @@ const Settings = () => {
                     </div>
 
                     {/* Cashier Payment Offer */}
-                    <div className="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 overflow-hidden">
+                    {/* <div className="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 overflow-hidden">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-amber-200 dark:border-amber-500/20">
                             <div className="flex items-center gap-2">
                                 <Tag size={15} className="text-amber-500" />
@@ -408,7 +408,7 @@ const Settings = () => {
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </div> */}
 
                     <Footer section="general" color="blue" label="Save Business Details" msgs={msgs} loading={loading} />
                 </form>
@@ -495,11 +495,10 @@ const Settings = () => {
                         ].map(opt => (
                             <button key={opt.id} type="button"
                                 onClick={() => setGeneralConfig({ ...generalConfig, dashboardView: opt.id })}
-                                className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${
-                                    generalConfig.dashboardView === opt.id
+                                className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${generalConfig.dashboardView === opt.id
                                         ? 'bg-orange-500 text-white shadow-md'
                                         : 'text-[var(--theme-text-muted)] hover:bg-[var(--theme-bg-hover)]'
-                                }`}>
+                                    }`}>
                                 <opt.icon size={16} />
                                 {opt.label}
                             </button>
@@ -529,11 +528,10 @@ const Settings = () => {
                         ].map(opt => (
                             <button key={opt.id} type="button"
                                 onClick={() => setGeneralConfig({ ...generalConfig, menuView: opt.id })}
-                                className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${
-                                    generalConfig.menuView === opt.id
+                                className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${generalConfig.menuView === opt.id
                                         ? 'bg-violet-600 text-white shadow-md'
                                         : 'text-[var(--theme-text-muted)] hover:bg-[var(--theme-bg-hover)]'
-                                }`}>
+                                    }`}>
                                 <opt.icon size={16} />
                                 {opt.label}
                             </button>
@@ -568,11 +566,10 @@ const Settings = () => {
                             ].map(opt => (
                                 <button key={opt.id} type="button"
                                     onClick={() => setGeneralConfig({ ...generalConfig, mobileMenuView: opt.id })}
-                                    className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${
-                                        generalConfig.mobileMenuView === opt.id
+                                    className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${generalConfig.mobileMenuView === opt.id
                                             ? 'bg-rose-600 text-white shadow-md'
                                             : 'text-[var(--theme-text-muted)] hover:bg-[var(--theme-bg-hover)]'
-                                    }`}>
+                                        }`}>
                                     <opt.icon size={16} />
                                     {opt.label}
                                 </button>

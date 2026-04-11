@@ -7,9 +7,9 @@ export const AuthContext = createContext({
     socket: null,
     settings: {},
     loading: true,
-    login: () => {},
-    logout: () => {},
-    fetchSettings: () => {},
+    login: () => { },
+    logout: () => { },
+    fetchSettings: () => { },
     formatPrice: (amount) => '',
     role: null,
     isAdmin: false,
@@ -64,13 +64,13 @@ export const AuthProvider = ({ children }) => {
             socketRef.current.disconnect();
             socketRef.current = null;
         }
-    
+
         const sUser = JSON.parse(sessionStorage.getItem('user') || 'null');
         const token = customToken || sUser?.token || user?.token;
-    
+
         const socketURL = import.meta.env.VITE_SOCKET_URL || API_BASE;
         const normalizedURL = socketURL.startsWith('http') ? socketURL : window.location.origin;
-    
+
         const newSocket = io(normalizedURL, {
             transports: ['websocket', 'polling'], // Prioritize websocket
             path: '/socket.io/',
@@ -84,17 +84,17 @@ export const AuthProvider = ({ children }) => {
             reconnectionDelayMax: 5000,
             timeout: 20000,
         });
-    
+
         const joinRooms = () => {
             newSocket.emit('join_branch');
             console.log('%c✅ Socket connected to restaurant main room', 'color: #10b981; font-weight: bold;');
-    
+
             if (role) {
                 newSocket.emit('join_role', role);
                 console.log('%c✅ Socket role-room joined:', 'color: #3b82f6; font-weight: bold;', `role_${role}`);
             }
         };
-    
+
         newSocket.on('connect', () => {
             setSocketConnected(true);
             setServerStatus('online');
@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }) => {
             // Trigger background sync for all active dashboards
             window.dispatchEvent(new CustomEvent('pos-refresh'));
         });
-    
+
         newSocket.on('reconnect', (attempt) => {
             setSocketConnected(true);
             setServerStatus('online');
@@ -111,7 +111,7 @@ export const AuthProvider = ({ children }) => {
             // Ensure data consistency after reconnection
             window.dispatchEvent(new CustomEvent('pos-refresh'));
         });
-    
+
         newSocket.on('disconnect', (reason) => {
             setSocketConnected(false);
             if (reason === 'io server disconnect') {
@@ -121,13 +121,13 @@ export const AuthProvider = ({ children }) => {
                 console.warn(`⚠️ Socket disconnected: ${reason}`);
             }
         });
-    
+
         newSocket.on('connect_error', (err) => {
             setSocketConnected(false);
             setServerStatus('offline');
             console.error('❌ Socket connection error:', err.message);
         });
-    
+
         socketRef.current = newSocket;
         setSocket(newSocket);
         return newSocket;
@@ -233,7 +233,7 @@ export const AuthProvider = ({ children }) => {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const formatPrice = (amount) => {
-        return `${settings.currencySymbol}${(amount || 0).toFixed(2)}`;
+        return `${settings.currencySymbol}${(amount || 0).toFixed(0)}`;
     };
 
     const role = user?.role || null;
