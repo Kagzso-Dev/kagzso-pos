@@ -396,7 +396,7 @@ const TakeAway = () => {
                                         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0 flex-1">
-                                                    <h4 className="text-[13px] font-black text-[var(--theme-text-main)] line-clamp-2 leading-tight uppercase tracking-tight group-hover:text-blue-500 transition-colors">
+                                                    <h4 className="text-[13px] font-medium text-[var(--theme-text-main)] line-clamp-2 leading-tight uppercase tracking-tight group-hover:text-blue-500 transition-colors">
                                                         {item.name}
                                                     </h4>
                                                     {item.variant && (
