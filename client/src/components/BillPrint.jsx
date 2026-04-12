@@ -113,8 +113,8 @@ ${order.orderType === 'dine-in'
 ${!isKOT ? `
 <div class="dash"></div>
 <div class="row"><span>Subtotal</span><span>${formatPrice(order.totalAmount)}</span></div>
-${order.sgst > 0 ? `<div class="row"><span>SGST (${sgstRate}%)</span><span>${formatPrice(order.sgst)}</span></div>` : (sgstRate > 0 ? `<div class="row"><span>SGST (${sgstRate}%)</span><span>${formatPrice(order.totalAmount * sgstRate / 100)}</span></div>` : '')}
-${order.cgst > 0 ? `<div class="row"><span>CGST (${cgstRate}%)</span><span>${formatPrice(order.cgst)}</span></div>` : (cgstRate > 0 ? `<div class="row"><span>CGST (${cgstRate}%)</span><span>${formatPrice(order.totalAmount * cgstRate / 100)}</span></div>` : '')}
+${settings.sgst > 0 ? `<div class="row"><span>SGST (${settings.sgst}%)</span><span>${formatPrice(order.sgst || (order.totalAmount * settings.sgst / 100))}</span></div>` : ''}
+${settings.cgst > 0 ? `<div class="row"><span>CGST (${settings.cgst}%)</span><span>${formatPrice(order.cgst || (order.totalAmount * settings.cgst / 100))}</span></div>` : ''}
 ${(order.sgst || 0) === 0 && (order.cgst || 0) === 0 && sgstRate === 0 && cgstRate === 0 && order.tax > 0 ? `<div class="row"><span>Tax</span><span>${formatPrice(order.tax)}</span></div>` : ''}
 ${order.discount > 0 ? `<div class="row"><span>Discount</span><span>&#8722; ${formatPrice(order.discount)}</span></div>` : ''}
 <div class="solid"></div>

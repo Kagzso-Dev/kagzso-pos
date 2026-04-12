@@ -270,20 +270,20 @@ const OrderDetailsModal = ({
                                 <span className="text-[12px] xs:text-[14px] font-black tabular-nums text-[var(--theme-text-main)] whitespace-nowrap">{formatPrice(order.totalAmount)}</span>
                             </div>
                             
-                            {(order.sgst > 0 || settings.sgst > 0) && (
+                            {settings.sgst > 0 && (
                                 <div className="flex justify-between items-center px-1 xs:px-2 gap-2 opacity-80">
-                                    <span className="text-[10px] xs:text-[11px] font-black uppercase tracking-wider xs:tracking-[0.15em] text-[var(--theme-text-muted)] whitespace-nowrap">SGST {order.sgst === 0 && settings.sgst ? `(${settings.sgst}%)` : ''}</span>
+                                    <span className="text-[10px] xs:text-[11px] font-black uppercase tracking-wider xs:tracking-[0.15em] text-[var(--theme-text-muted)] whitespace-nowrap">SGST ({settings.sgst}%)</span>
                                     <span className="text-[12px] xs:text-[14px] font-black tabular-nums text-[var(--theme-text-main)] whitespace-nowrap">
-                                        {order.sgst > 0 ? formatPrice(order.sgst) : formatPrice(order.totalAmount * settings.sgst / 100)}
+                                        {formatPrice(order.sgst || (order.totalAmount * settings.sgst / 100))}
                                     </span>
                                 </div>
                             )}
-
-                            {(order.cgst > 0 || settings.cgst > 0) && (
+                            
+                            {settings.cgst > 0 && (
                                 <div className="flex justify-between items-center px-1 xs:px-2 gap-2 opacity-80">
-                                    <span className="text-[10px] xs:text-[11px] font-black uppercase tracking-wider xs:tracking-[0.15em] text-[var(--theme-text-muted)] whitespace-nowrap">CGST {order.cgst === 0 && settings.cgst ? `(${settings.cgst}%)` : ''}</span>
+                                    <span className="text-[10px] xs:text-[11px] font-black uppercase tracking-wider xs:tracking-[0.15em] text-[var(--theme-text-muted)] whitespace-nowrap">CGST ({settings.cgst}%)</span>
                                     <span className="text-[12px] xs:text-[14px] font-black tabular-nums text-[var(--theme-text-main)] whitespace-nowrap">
-                                        {order.cgst > 0 ? formatPrice(order.cgst) : formatPrice(order.totalAmount * settings.cgst / 100)}
+                                        {formatPrice(order.cgst || (order.totalAmount * settings.cgst / 100))}
                                     </span>
                                 </div>
                             )}

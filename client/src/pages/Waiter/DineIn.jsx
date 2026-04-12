@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect, useMemo, useCallback } from 'react';
+import { useState, useContext, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
@@ -36,16 +36,31 @@ const DineIn = () => {
     const orderIdFromUrl = queryParams.get('orderId');
 
     const initialOrderId = location.state?.orderId || orderIdFromUrl;
-    const [existingOrderId, setExistingOrderId] = useState(initialOrderId);
-    const [isAddingItems, setIsAddingItems] = useState(!!initialOrderId);
-    const [step, setStep] = useState(initialOrderId ? 3 : 2);
+    const [existingOrderId, setExistingOrderId] = useState(() => initialOrderId || localStorage.getItem('kagzso_active_dinein_orderId'));
+    const [isAddingItems, setIsAddingItems] = useState(() => !!initialOrderId || localStorage.getItem('kagzso_active_dinein_isAdding') === 'true');
+    const [step, setStep] = useState(() => {
+        if (initialOrderId) return 3;
+        const savedStep = localStorage.getItem('kagzso_active_dinein_step');
+        return savedStep ? parseInt(savedStep) : 2;
+    });
     const orderType = 'dine-in';
-    const [selectedTable, setSelectedTable] = useState(null);
-    const [cart, setCart] = useState([]);
+    const [selectedTable, setSelectedTable] = useState(() => {
+        try {
+            const saved = localStorage.getItem('kagzso_active_dinein_table');
+            return saved ? JSON.parse(saved) : null;
+        } catch { return null; }
+    });
+    const [cart, setCart] = useState(() => {
+        try {
+            const saved = localStorage.getItem('kagzso_active_dinein_cart');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
     const [existingItems, setExistingItems] = useState([]);
     const [originalTotal, setOriginalTotal] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderLoading, setOrderLoading] = useState(!!initialOrderId);
+    const prevCartLength = useRef(0);
 
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 250);
@@ -74,6 +89,17 @@ const DineIn = () => {
             setViewMode(defaultView);
         }
     }, [settings?.menuView, settings?.mobileMenuView, settings?.enforceMenuView, userInteracted]);
+
+    // ── Persistence ───────────────────────────────────────────────────
+    useEffect(() => {
+        localStorage.setItem('kagzso_active_dinein_step', step);
+        localStorage.setItem('kagzso_active_dinein_cart', JSON.stringify(cart));
+        localStorage.setItem('kagzso_active_dinein_isAdding', isAddingItems);
+        if (selectedTable) localStorage.setItem('kagzso_active_dinein_table', JSON.stringify(selectedTable));
+        else localStorage.removeItem('kagzso_active_dinein_table');
+        if (existingOrderId) localStorage.setItem('kagzso_active_dinein_orderId', existingOrderId);
+        else localStorage.removeItem('kagzso_active_dinein_orderId');
+    }, [step, cart, isAddingItems, selectedTable, existingOrderId]);
 
     const handleViewToggle = (newMode) => {
         setViewMode(newMode);
@@ -124,9 +150,21 @@ const DineIn = () => {
         const price = variant ? variant.price : item.price;
         setCart(prev => {
             const existing = prev.find(i => i.cartKey === cartKey);
-            if (existing) return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: existing.quantity + 1 } : i);
+            if (existing) {
+                console.log('Cart updated: Quantity increased for', item.name);
+                return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: existing.quantity + 1 } : i);
+            }
+            console.log('Cart updated: Item added -', item.name);
             return [...prev, { ...item, cartKey, price, variant: variant || null, quantity: 1, notes: '' }];
         });
+    }, []);
+
+    const resetOrderSession = useCallback(() => {
+        console.log('Cart empty – clearing items but staying on menu');
+        setCart([]);
+        setExistingItems([]);
+        setIsCartOpen(false);
+        localStorage.removeItem('kagzso_active_dinein_cart');
     }, []);
 
     const updateQuantity = useCallback((cartKey, delta) => {
@@ -134,17 +172,41 @@ const DineIn = () => {
             const existing = prev.find(i => i.cartKey === cartKey);
             if (!existing) return prev;
             const newQty = existing.quantity + delta;
-            if (newQty <= 0) return prev.filter(i => i.cartKey !== cartKey);
+            
+            if (newQty <= 0) {
+                console.log('Item removed:', existing.name);
+                const updated = prev.filter(i => i.cartKey !== cartKey);
+                if (updated.length === 0) {
+                    // This will be caught by the useEffect to trigger resetOrderSession
+                }
+                return updated;
+            }
+            console.log('Cart updated:', existing.name, 'quantity set to', newQty);
             return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: newQty } : i);
         });
     }, []);
+
+    // Effect to handle full reset when cart becomes empty
+    useEffect(() => {
+        if (prevCartLength.current > 0 && cart.length === 0) {
+            // User manually removed all items or cleared the cart
+            if (step === 3) {
+                resetOrderSession();
+            }
+        }
+        prevCartLength.current = cart.length;
+    }, [cart.length, step, resetOrderSession]);
 
     const handleItemAdd = (item, variant = null) => {
         if (!variant && item.variants?.length > 0) return;
         addToCart(item, variant);
     };
 
-    const clearCart = () => { if (window.confirm('Clear all items?')) setCart([]); };
+    const clearCart = () => { 
+        if (window.confirm('Clear all items and reset order?')) {
+            resetOrderSession();
+        }
+    };
 
     // ── Deduplicated categories (from API list + menu item categories) ───
     const categories = useMemo(() => {
@@ -268,18 +330,12 @@ const DineIn = () => {
                         style={{ overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' }}
                     >
                         <TableGrid
-                            allowedStatuses={['available', 'occupied', 'reserved']}
+                            allowedStatuses={['available']}
                             filterByAllowedStatuses={false}
                             showCleanAction={true}
                             onSelectTable={(table) => {
-                                if (table.status === 'occupied' && table.currentOrderId) {
-                                    setExistingOrderId(table.currentOrderId);
-                                    setIsAddingItems(true);
-                                    setStep(3);
-                                } else {
-                                    setSelectedTable(table);
-                                    setStep(3);
-                                }
+                                setSelectedTable(table);
+                                setStep(3);
                             }}
                         />
                     </div>
@@ -293,44 +349,39 @@ const DineIn = () => {
                     {/* Menu Panel */}
                     <div className="flex-1 h-full min-h-0 flex flex-col min-w-0 bg-[var(--theme-bg-card)] rounded-3xl border border-[var(--theme-border)] shadow-2xl overflow-hidden">
 
-                        {/* ── Top Bar — High Density UI Optimized ── */}
-                        <div className="px-4 py-4 border-b border-[var(--theme-border)] flex flex-col gap-4 flex-shrink-0 bg-[var(--theme-bg-card)] shadow-sm">
-                            {/* Row 1: Back, Toggle, Cart */}
-                            <div className="flex items-center justify-between gap-3">
-                                <button 
-                                    onClick={() => isAddingItems ? navigate('/waiter', { replace: true }) : setStep(2)} 
-                                    className="w-12 h-12 flex items-center justify-center bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text-main)] rounded-2xl border border-[var(--theme-border)] shadow-sm active:scale-95 transition-all shrink-0"
-                                >
-                                    <ArrowLeft size={20} />
-                                </button>
+                        <div className="px-4 py-3 border-b border-[var(--theme-border)] flex items-center gap-4 flex-shrink-0 bg-[var(--theme-bg-card)] shadow-sm">
+                            <button 
+                                onClick={() => navigate('/waiter', { replace: true })} 
+                                className="w-10 h-10 flex items-center justify-center bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text-main)] rounded-xl border border-[var(--theme-border)] shadow-sm active:scale-95 transition-all shrink-0"
+                            >
+                                <ArrowLeft size={18} />
+                            </button>
 
-                                <div className="flex-1 flex justify-end items-center gap-2">
-                                    {!settings?.enforceMenuView && <ViewToggle viewMode={viewMode} setViewMode={handleViewToggle} />}
-                                    
-                                    <button
-                                        onClick={() => setIsCartOpen(!isCartOpen)}
-                                        className={`relative w-12 h-12 flex items-center justify-center rounded-2xl transition-all border shadow-sm active:scale-95 shrink-0 ${isCartOpen ? 'bg-orange-500 text-white border-orange-600 shadow-orange-500/20' : 'bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] border-[var(--theme-border)]'}`}
-                                    >
-                                        <ShoppingCart size={20} />
-                                        {cart.length > 0 && (
-                                            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black bg-orange-600 text-white border-2 border-[var(--theme-bg-card)] shadow-lg">
-                                                {cart.length}
-                                            </span>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Row 2: Search */}
-                            <div className="relative w-full group">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)] group-focus-within:text-orange-500 transition-colors" size={18} />
+                            <div className="relative flex-1 group">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)] group-focus-within:text-orange-500 transition-colors" size={16} />
                                 <input
                                     type="text"
                                     placeholder="Search menu..."
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
-                                    className="w-full bg-[var(--theme-bg-dark)] text-[var(--theme-text-main)] rounded-2xl pl-11 pr-4 py-3 border border-[var(--theme-border)] focus:bg-[var(--theme-bg-hover)] focus:border-orange-500/30 focus:ring-4 focus:ring-orange-500/5 transition-all text-sm h-12 outline-none"
+                                    className="w-full bg-[var(--theme-bg-dark)] text-[var(--theme-text-main)] rounded-xl pl-9 pr-4 py-2 border border-[var(--theme-border)] focus:bg-[var(--theme-bg-hover)] focus:border-orange-500/30 transition-all text-sm h-10 outline-none"
                                 />
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                                {!settings?.enforceMenuView && <ViewToggle viewMode={viewMode} setViewMode={handleViewToggle} />}
+                                
+                                {cart.length > 0 && (
+                                    <button
+                                        onClick={() => setIsCartOpen(!isCartOpen)}
+                                        className={`relative w-10 h-10 flex items-center justify-center rounded-xl transition-all border shadow-sm active:scale-95 shrink-0 ${isCartOpen ? 'bg-orange-500 text-white border-orange-600 shadow-orange-500/20' : 'bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] border-[var(--theme-border)]'}`}
+                                    >
+                                        <ShoppingCart size={18} />
+                                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black bg-orange-600 text-white border-2 border-[var(--theme-bg-card)] shadow-lg">
+                                            {cart.length}
+                                        </span>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -372,16 +423,6 @@ const DineIn = () => {
                                         {selectedCategory === cat._id && <div className="absolute inset-x-0 bottom-0 h-full bg-current/5 animate-fade-in pointer-events-none" />}
                                     </button>
                                 ))}
-                                {/* View All Button */}
-                                <button
-                                    onClick={() => setIsCategoryModalOpen(true)}
-                                    className="flex flex-shrink-0 snap-start flex-col items-center justify-center py-2.5 px-8 min-w-[100px] gap-1.5 transition-all border-b-4 border-transparent text-orange-500 hover:bg-orange-500/5"
-                                >
-                                    <div className="w-5 h-5 rounded-full flex items-center justify-center bg-orange-500 text-white shadow-sm">
-                                        <LayoutGrid size={10} strokeWidth={3} />
-                                    </div>
-                                    <span className="text-[10px] font-black uppercase tracking-widest leading-none">View All</span>
-                                </button>
                             </div>
 
                             {/* Items Grid — Premium Independent Scroll UI */}
@@ -426,10 +467,20 @@ const DineIn = () => {
 
                     {/* Cart Side Panel — Optimized Tablet Width */}
                     <aside 
-                        className={`fixed inset-y-0 right-0 z-[100] md:relative md:z-0 md:flex flex-col border-l border-[var(--theme-border)] bg-[var(--theme-bg-card)] shadow-2xl transition-all duration-300 transform
-                            ${isCartOpen ? 'w-[85vw] sm:w-[50vw] md:w-[320px] lg:w-[380px] xl:w-[420px] translate-x-0' : 'w-0 translate-x-full md:translate-x-0 md:w-0 overflow-hidden opacity-0'}`}
+                        className={`
+                            fixed z-[100] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform flex flex-col
+                            md:relative md:z-0 md:translate-x-0 border-[var(--theme-border)]
+                            ${(isCartOpen && cart.length > 0) 
+                                ? 'translate-x-0 opacity-100 shadow-2xl ring-1 ring-black/5 ' +
+                                  'inset-y-0 right-0 w-[90vw] ' +
+                                  'sm:inset-y-4 sm:right-4 sm:w-[400px] sm:rounded-[3rem] ' +
+                                  'md:inset-y-0 md:right-0 md:w-[320px] lg:w-[380px] xl:w-[420px] md:rounded-3xl md:border-l'
+                                : 'translate-x-full opacity-0 w-0 md:w-0 overflow-hidden'
+                            }
+                            bg-[var(--theme-bg-card)]
+                        `}
                     >
-                        {isCartOpen && <div onClick={() => setIsCartOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" />}
+                        {(isCartOpen && cart.length > 0) && <div onClick={() => setIsCartOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" />}
 
                         <div className="relative h-full w-full bg-[var(--theme-bg-card)] flex flex-col overflow-hidden">
                             {/* Header */}
@@ -469,9 +520,9 @@ const DineIn = () => {
                                     </div>
                                 ) : (
                                     <div className="px-4 py-4 space-y-4">
-                                        {isAddingItems && existingItems.length > 0 && (
+                                        {isAddingItems && existingItems.filter(item => item.status !== 'CANCELLED').length > 0 && (
                                             <div className="space-y-2 opacity-60">
-                                                {existingItems.map((item, idx) => (
+                                                {existingItems.filter(item => item.status !== 'CANCELLED').map((item, idx) => (
                                                     <div key={idx} className="flex items-center justify-between text-[10px] font-bold text-[var(--theme-text-muted)] uppercase tracking-tight py-1 border-b border-[var(--theme-border)]/30">
                                                         <div className="flex items-center gap-2">
                                                             <span>{item.quantity}x</span>
@@ -546,7 +597,8 @@ const DineIn = () => {
                                     <div className="space-y-1.5">
                                         {isAddingItems ? (
                                             (() => {
-                                                const existingSubtotal = existingItems.filter(i => i.status !== 'CANCELLED').reduce((s, i) => s + (i.price * i.quantity), 0);
+                                                const existingItemsActive = existingItems.filter(i => i.status !== 'CANCELLED');
+                                                const existingSubtotal = existingItemsActive.reduce((s, i) => s + (i.price * i.quantity), 0);
                                                 const combinedSubtotal = existingSubtotal + totalAmount;
                                                 
                                                 const taxResults = calculateTax(combinedSubtotal, settings, { discount: 0 });
@@ -573,7 +625,7 @@ const DineIn = () => {
                                                         <div className="flex justify-between items-center pt-2 border-t-2 border-dashed border-[var(--theme-border)]">
                                                             <div>
                                                                 <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] block leading-none">NEW TOTAL ESTIMATE</span>
-                                                                <span className="text-[10px] font-bold text-[var(--theme-text-muted)] italic">Includes {existingItems.length} old + {cart.length} new</span>
+                                                                <span className="text-[10px] font-bold text-[var(--theme-text-muted)] italic">Includes {existingItemsActive.length} old + {cart.length} new</span>
                                                             </div>
                                                             <span className="text-2xl font-black text-orange-500 tabular-nums">
                                                                 {formatPrice(combinedFinal)}

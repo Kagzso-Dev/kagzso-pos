@@ -65,6 +65,47 @@ const FoodItem = memo(({
 
     const isVeg = item.isVeg;
 
+    /* ── MINI TAB VIEW (Compact Grid) ───────────────────────────────────── */
+    if (viewMode === 'mini') {
+        const currentVariantKey = selectedSize ? `${item._id}_${selectedSize.name}` : item._id;
+        const currentVariantQty = selectedSize
+            ? (itemCart?.find(c => c.cartKey === currentVariantKey)?.quantity || 0)
+            : cartQty;
+
+        return (
+            <div
+                className={`group relative bg-[var(--theme-bg-card)] rounded-xl border transition-all flex items-center p-2 gap-3 animate-fade-in ${cartQty > 0 ? 'border-orange-500 shadow-sm ring-1 ring-orange-500/10' : 'border-[var(--theme-border)] hover:border-orange-500/20 active:scale-[0.99]'} ${!isAdmin && item.availability !== false ? 'cursor-pointer' : ''}`}
+                onClick={() => !isAdmin && item.availability !== false && onAdd(item, selectedSize)}
+            >
+                {/* Mini Color Indicator */}
+                <div className={`w-1 h-8 rounded-full shrink-0 ${isVeg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-[12px] font-black text-[var(--theme-text-main)] leading-tight truncate uppercase tracking-tight">{item.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[11px] font-black text-orange-500 tracking-tighter">
+                            {formatPrice(selectedSize ? selectedSize.price : item.price)}
+                        </span>
+                        {item.variants?.length > 0 && (
+                            <span className="text-[8px] font-bold text-[var(--theme-text-muted)] uppercase px-1.5 py-0.5 bg-[var(--theme-bg-dark)] rounded-md border border-[var(--theme-border)]">
+                                {selectedSize ? selectedSize.name : 'Multiple'}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {showActions && !isAdmin && (
+                    <QtyControl
+                        qty={currentVariantQty}
+                        onAdd={() => onAdd(item, selectedSize)}
+                        onRemove={() => onRemove(item.variants?.length > 0 ? currentVariantKey : item._id)}
+                        size="sm"
+                    />
+                )}
+            </div>
+        );
+    }
+
     /* ── LIST VIEW ──────────────────────────────────────────────────────── */
     if (viewMode === 'list') {
         const basePrice = item.price;

@@ -197,17 +197,17 @@ const Receipt = ({ order, formatPrice, settings }) => (
                 <span className="font-bold">{formatPrice(order.totalAmount)}</span>
             </div>
             
-            {(order.sgst > 0 || settings?.sgst > 0) && (
+            {settings?.sgst > 0 && (
                 <div className="flex justify-between text-[11px]">
-                    <span className="font-bold uppercase tracking-widest text-[9px] opacity-60">SGST ({settings?.sgst || 0}%):</span>
-                    <span className="font-bold">{formatPrice(order.sgst || (order.totalAmount * (settings?.sgst || 0) / 100))}</span>
+                    <span className="font-bold uppercase tracking-widest text-[9px] opacity-60">SGST ({settings.sgst}%):</span>
+                    <span className="font-bold">{formatPrice(order.sgst || (order.totalAmount * settings.sgst / 100))}</span>
                 </div>
             )}
             
-            {(order.cgst > 0 || settings?.cgst > 0) && (
+            {settings?.cgst > 0 && (
                 <div className="flex justify-between text-[11px]">
-                    <span className="font-bold uppercase tracking-widest text-[9px] opacity-60">CGST ({settings?.cgst || 0}%):</span>
-                    <span className="font-bold">{formatPrice(order.cgst || (order.totalAmount * (settings?.cgst || 0) / 100))}</span>
+                    <span className="font-bold uppercase tracking-widest text-[9px] opacity-60">CGST ({settings.cgst}%):</span>
+                    <span className="font-bold">{formatPrice(order.cgst || (order.totalAmount * settings.cgst / 100))}</span>
                 </div>
             )}
 

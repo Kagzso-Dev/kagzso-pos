@@ -347,6 +347,15 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
                                 </div>
 
                                 <div className="flex flex-col items-end gap-0.5 min-w-0">
+                                    <div className="flex flex-col items-end gap-1 mb-2">
+                                        <p className="text-[8px] sm:text-[9px] text-[var(--theme-text-muted)] font-black uppercase tracking-wider opacity-60">Subtotal: {formatPrice(order.totalAmount)}</p>
+                                        {settings?.sgst > 0 && (
+                                            <p className="text-[8px] sm:text-[9px] text-[var(--theme-text-muted)] font-black uppercase tracking-wider opacity-60">SGST ({settings.sgst}%): {formatPrice(order.sgst || (order.totalAmount * settings.sgst / 100))}</p>
+                                        )}
+                                        {settings?.cgst > 0 && (
+                                            <p className="text-[8px] sm:text-[9px] text-[var(--theme-text-muted)] font-black uppercase tracking-wider opacity-60">CGST ({settings.cgst}%): {formatPrice(order.cgst || (order.totalAmount * settings.cgst / 100))}</p>
+                                        )}
+                                    </div>
                                     <p className="text-[8px] sm:text-[9px] text-[var(--theme-text-muted)] font-black uppercase tracking-[0.25em] mb-1 opacity-60">Grand Total</p>
                                     <div className="flex flex-col items-end leading-none">
                                         <p className="text-2xl sm:text-3xl xs:text-4xl font-black text-orange-500 tracking-tighter drop-shadow-xl animate-fade-in-up whitespace-nowrap">
