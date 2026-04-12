@@ -29,9 +29,7 @@ export const AuthProvider = ({ children }) => {
                 const u = JSON.parse(raw);
                 if (u?.token) return u;
             }
-            // Fallback to localStorage (offline/cached)
-            raw = localStorage.getItem('offlineUser');
-            return raw ? JSON.parse(raw) : null;
+            return null;
         } catch {
             return null;
         }
@@ -202,7 +200,7 @@ export const AuthProvider = ({ children }) => {
 
             setUser(userData);
             sessionStorage.setItem('user', JSON.stringify(userData));
-            localStorage.setItem('offlineUser', JSON.stringify(userData));
+
 
             initSocket(userData.role, userData.token);
             fetchSettings();
@@ -220,7 +218,7 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setUser(null);
         sessionStorage.removeItem('user');
-        localStorage.removeItem('offlineUser');
+
         if (socketRef.current) {
             socketRef.current.disconnect();
             socketRef.current = null;
