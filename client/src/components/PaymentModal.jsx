@@ -338,7 +338,7 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
                                 <div className="flex flex-col gap-1.5 shrink-0">
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-[8px] sm:text-[9px] font-black bg-white dark:bg-white/5 rounded-full px-2 sm:px-3 py-1.5 text-[var(--theme-text-main)] border border-[var(--theme-border)] shadow-sm uppercase tracking-wider">
-                                            {String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                                            {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                                         </span>
                                     </div>
                                     <span className="text-[8px] sm:text-[9px] w-fit font-black bg-orange-500/10 rounded-full px-2 sm:px-3 py-1.5 text-orange-500 border border-orange-500/20 uppercase tracking-wider leading-none">

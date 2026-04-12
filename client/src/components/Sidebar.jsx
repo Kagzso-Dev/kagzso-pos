@@ -8,7 +8,7 @@ import {
     ChevronRight, X, TrendingUp, Bell, History, XCircle, CheckCircle2, Armchair,
     Package
 } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+const logoImg = '/logo.png';
 import ThemeSwitcher from './ThemeSwitcher';
 
 
@@ -134,7 +134,8 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
 
                     {!collapsed && (
                         <div className="flex flex-col justify-center text-left">
-                            <h1 className="text-sm font-black tracking-tight text-[var(--theme-text-main)] truncate leading-none uppercase flex items-center gap-2">
+                            <span className="text-sm font-black text-orange-500 uppercase leading-tight">KAGZSO</span>
+                            <h1 className="text-xs font-black tracking-tight text-[var(--theme-text-main)] truncate leading-tight uppercase flex items-center gap-2">
                                 {settings?.restaurantName || 'admin'}
                                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--theme-border)]">
                                     <div className={`w-1.5 h-1.5 rounded-full ${socketConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'} `} />

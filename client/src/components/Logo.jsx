@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import logoImg from '../assets/logo.png';
+const logoImg = '/logo.png';
 
 
 const Logo = ({ size = 'md', showText = true }) => {

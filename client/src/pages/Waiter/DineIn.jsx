@@ -489,38 +489,50 @@ const DineIn = () => {
                                         )}
 
                                         {cart.map(item => (
-                                            <div key={item.cartKey} className="flex items-center gap-3 animate-slide-up hover:bg-orange-500/5 p-1 -m-1 rounded-xl transition-colors group">
+                                            <div key={item.cartKey} className="flex items-start gap-4 animate-slide-up hover:bg-orange-500/5 p-2 -m-1 rounded-2xl transition-all group border border-transparent hover:border-[var(--theme-border)]/50">
                                                 <OptimizedImage 
                                                     src={item.image} 
                                                     alt={item.name} 
                                                     width={100}
-                                                    containerClassName="w-10 h-10 rounded-lg flex-shrink-0 shadow-sm"
+                                                    containerClassName="w-12 h-12 rounded-xl flex-shrink-0 shadow-lg border border-[var(--theme-border)]/30 overflow-hidden"
                                                 />
-                                                <div className="flex-1 min-w-0 flex items-center justify-between gap-1.5">
-                                                    <div className="min-w-0 flex-1 pr-1">
-                                                        <h4 className="text-[12px] font-black text-[var(--theme-text-main)] truncate leading-tight uppercase tracking-tighter">{item.name}</h4>
-                                                        {item.variant && <p className="text-[8px] font-black text-orange-500 uppercase leading-none mt-0.5">{item.variant.name}</p>}
+                                                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0 flex-1">
+                                                            <h4 className="text-[13px] font-black text-[var(--theme-text-main)] line-clamp-2 leading-tight uppercase tracking-tight group-hover:text-orange-500 transition-colors">
+                                                                {item.name}
+                                                            </h4>
+                                                            {item.variant && (
+                                                                <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest mt-1 bg-orange-500/10 px-1.5 py-0.5 rounded-md inline-block">
+                                                                    {item.variant.name}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-[13px] font-black text-orange-500 tabular-nums tracking-tighter shrink-0">
+                                                            {formatPrice(item.price * item.quantity)}
+                                                        </span>
                                                     </div>
 
-                                                    <div className="flex items-center shrink-0">
-                                                        <div className="flex items-center bg-[var(--theme-bg-dark)] rounded-full p-0.5 border border-[var(--theme-border)] shadow-inner">
+                                                    <div className="flex items-center justify-between mt-1">
+                                                        <div className="flex items-center bg-[var(--theme-bg-dark)] rounded-xl p-0.5 border border-[var(--theme-border)] shadow-inner">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); updateQuantity(item.cartKey, -1); }}
-                                                                className="w-6 h-6 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-orange-500 transition-all active:scale-75"
+                                                                className="w-7 h-7 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-all active:scale-75"
                                                             >
-                                                                <Minus size={11} strokeWidth={3} />
+                                                                <Minus size={12} strokeWidth={3} />
                                                             </button>
-                                                            <span className="w-5 text-center text-[10px] font-black text-[var(--theme-text-main)] tabular-nums">{item.quantity}</span>
+                                                            <span className="w-8 text-center text-[11px] font-black text-[var(--theme-text-main)] tabular-nums">{item.quantity}</span>
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); updateQuantity(item.cartKey, 1); }}
-                                                                className="w-6 h-6 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-orange-500 transition-all active:scale-75"
+                                                                className="w-7 h-7 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-all active:scale-75"
                                                             >
-                                                                <Plus size={11} strokeWidth={3} />
+                                                                <Plus size={12} strokeWidth={3} />
                                                             </button>
                                                         </div>
+                                                        <span className="text-[9px] font-bold text-[var(--theme-text-muted)] uppercase tracking-widest opacity-40">
+                                                            {formatPrice(item.price)} ea
+                                                        </span>
                                                     </div>
-
-                                                    <span className="text-[12px] font-black text-orange-500 min-w-[50px] text-right tabular-nums tracking-tighter shrink-0">{formatPrice(item.price * item.quantity)}</span>
                                                 </div>
                                             </div>
                                         ))}

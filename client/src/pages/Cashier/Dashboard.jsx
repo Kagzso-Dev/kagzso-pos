@@ -4,7 +4,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { getCachedOrders, getPendingOrders } from '../../db/db';
-import logoImg from '../../assets/logo.png';
+const logoImg = '/logo.png';
 import PaymentModal from '../../components/PaymentModal';
 import CancelOrderModal from '../../components/CancelOrderModal';
 import StatusBadge from '../../components/StatusBadge';
@@ -34,7 +34,7 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
             ready:     { bg: 'bg-emerald-50 border-emerald-300',text: 'text-emerald-700',dot: 'bg-emerald-500',label: 'bg-emerald-100 text-emerald-800' },
             readytoserve: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-600', dot: 'bg-blue-500', label: 'bg-blue-100 text-blue-700' },
             payment:   { bg: 'bg-rose-50 border-rose-300 shadow-rose-200', text: 'text-rose-700', dot: 'bg-rose-600', label: 'bg-rose-100 text-rose-800' },
-            completed: { bg: 'bg-gray-100 border-gray-300',   text: 'text-gray-800',   dot: 'bg-gray-600',   label: 'bg-gray-200 text-gray-800' }
+            completed: { bg: 'bg-red-50 border-red-300',   text: 'text-red-700',   dot: 'bg-red-500',   label: 'bg-red-100 text-red-800' }
         }[currentStatus] || { bg: 'bg-gray-50 border-gray-100', text: 'text-gray-400', dot: 'bg-gray-300', label: 'bg-gray-100 text-gray-500' };
 
     if (isGrid) {
@@ -83,18 +83,20 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
     }
 
     const tColor = tokenColors[order.orderStatus] || 'bg-[var(--theme-bg-card)] border-[var(--theme-border)] text-[var(--theme-text-main)]';
+    const isPaid = order.paymentStatus === 'paid';
     return (
         <button
             onClick={onClick}
             className={`
                 w-full text-left transition-all duration-200 group token-tap rounded-2xl
                 ${tColor}
-                ${isList ? 'p-3 border-l-[6px]' : 'p-3.5 border-l-[8px]'}
-                ${order.orderStatus === 'pending' ? 'border-l-[var(--status-pending)]' :
+                ${order.paymentStatus === 'paid' ? 'border-l-red-500 bg-red-500/10' :
+                  isList ? 'p-3 border-l-[6px]' : 'p-3.5 border-l-[8px]'}
+                ${order.paymentStatus !== 'paid' && (order.orderStatus === 'pending' ? 'border-l-[var(--status-pending)]' :
                   order.orderStatus === 'ready' ? 'border-l-[var(--status-ready)]' :
                   order.orderStatus === 'readyToServe' ? 'border-l-[var(--status-readyToServe)]' :
                   order.orderStatus === 'payment' ? 'border-l-[var(--status-payment)]' :
-                  'border-l-transparent'}
+                  'border-l-transparent')}
                 ${selected ? 'ring-2 ring-orange-500 shadow-xl scale-[1.01]' : 'hover:scale-[1.005] shadow-md'}
             `}
         >
@@ -105,7 +107,7 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
                         <span className="inline-flex items-center justify-center min-w-[32px] h-6 font-black text-inherit text-[9px] px-1.5 bg-black/10 rounded-lg border border-current/20 shrink-0 whitespace-nowrap">
                             {order.orderType === 'dine-in' ? `T${order.tableId?.number || order.tableId || '?'}` : `TK${order.tokenNumber}`}
                         </span>
-                        <p className="text-[10px] font-black text-inherit truncate leading-none">{order.orderNumber}</p>
+                        <p className="text-[10px] font-black text-inherit truncate leading-none">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                         <p className="text-[11px] font-black text-inherit whitespace-nowrap">{formatPrice(order.finalAmount)}</p>
@@ -116,7 +118,7 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
                 /* ── Normal card ── */
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-extrabold text-inherit tracking-tight truncate pr-2">{order.orderNumber}</h3>
+                        <h3 className="text-sm font-extrabold text-inherit tracking-tight truncate pr-2">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</h3>
                         <StatusBadge status={order.orderStatus} />
                     </div>
                     <div className="flex items-center justify-between">
@@ -143,12 +145,7 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
 /* ── Receipt ──────────────────────────────────────────────────────────────── */
 const Receipt = ({ order, formatPrice, settings }) => (
     <div id="printable-receipt" className="w-full max-w-sm mx-auto bg-white text-black px-6 py-6 relative shadow-2xl">
-        {/* Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
-            <span className="text-[100px] font-black uppercase rotate-45">
-                KA
-            </span>
-        </div>
+        {/* Watermark removed */}
 
         {/* Header */}
         <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4 relative z-10">
@@ -166,7 +163,7 @@ const Receipt = ({ order, formatPrice, settings }) => (
             </div>
             <div className="text-right">
                 <p><strong>Invoice:</strong> #INV-{order.orderNumber?.split('-')[1]}</p>
-                <p><strong>Order:</strong> {order.orderNumber}</p>
+                <p><strong>Order:</strong> {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</p>
             </div>
         </div>
 
@@ -262,7 +259,7 @@ const CashierDashboard = () => {
         const sidebar = document.querySelector('aside');
         return (sidebar && sidebar.offsetWidth > 120) ? 3 : 4;
     });
-    const { user, socket, formatPrice, settings } = useContext(AuthContext);
+    const { user, socket, formatPrice, formatOrderNumber, settings } = useContext(AuthContext);
     const location = useLocation();
     const navigate = useNavigate();
     const isHistoryMode = location.pathname.includes('/history');

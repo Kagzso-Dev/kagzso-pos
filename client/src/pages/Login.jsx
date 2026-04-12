@@ -2,7 +2,7 @@ import { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, CheckCircle, Eye, EyeOff, Loader2, ChevronLeft, X } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+const logoImg = '/logo.png';
 import HeroSection from '../components/HeroSection';
 
 // Helper: get dashboard path by role

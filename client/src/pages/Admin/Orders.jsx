@@ -315,10 +315,12 @@ const AdminOrders = () => {
         }
 
         if (searchQuery) {
-            temp = temp.filter(o =>
-                o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                o.customerInfo?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-            );
+            temp = temp.filter(o => {
+                const displayNum = `${o.orderType === 'dine-in' ? 'DI' : 'TK'}-${String(o.orderNumber).startsWith('ORD-') ? String(o.orderNumber).replace('ORD-', '') : o.orderNumber}`;
+                return displayNum.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    o.customerInfo?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+            });
         }
 
         setFilteredOrders(temp);
@@ -350,7 +352,8 @@ const AdminOrders = () => {
     }, []);
 
     const handleProcessPayment = async (order) => {
-        if (!window.confirm(`Process payment of ${formatPrice(order.finalAmount)} for ${order.orderNumber}?`)) return;
+        const displayOrderNum = order.orderType === 'dine-in' ? 'DI' : 'TK' + '-' + (String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber);
+        if (!window.confirm(`Process payment of ${formatPrice(order.finalAmount)} for ${displayOrderNum}?`)) return;
 
         try {
             const res = await api.put(`/orders/${order._id}/payment`, {
@@ -511,7 +514,7 @@ const AdminOrders = () => {
                                         <td className="px-3 sm:px-6 py-3 sm:py-4">
                                             <div className="flex flex-col min-w-0">
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5 mb-1">
-                                                    <span className="font-black text-inherit text-[11px] sm:text-sm tracking-tight truncate">{order.orderNumber}</span>
+                                                    <span className="font-black text-inherit text-[11px] sm:text-sm tracking-tight truncate">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</span>
                                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-black/5 text-[8px] font-black uppercase border border-current/10 w-fit">
                                                         {order.orderType === 'dine-in' ? `T${order.tableId?.number || order.tableId || '?'}` : `TK${order.tokenNumber || '?'}`}
                                                     </span>

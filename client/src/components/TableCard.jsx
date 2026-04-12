@@ -40,15 +40,15 @@ export const STATUS_CONFIG = {
     },
     cleaning: {
         bg: 'bg-white',
-        border: 'border-gray-200',
-        dot: 'bg-gray-400',
-        text: 'text-gray-500',
+        border: 'border-yellow-300',
+        dot: 'bg-yellow-400',
+        text: 'text-yellow-500',
         label: 'Cleaning',
         icon: Clock,
-        chairColor: 'text-gray-400',
-        badgeBg: 'bg-gray-50 text-gray-600 border-gray-200',
-        hoverBg: 'hover:border-gray-400 hover:shadow-gray-100',
-        ring: 'ring-gray-400/30',
+        chairColor: 'text-yellow-400',
+        badgeBg: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+        hoverBg: 'hover:border-yellow-400 hover:shadow-yellow-100',
+        ring: 'ring-yellow-400/30',
     },
 };
 

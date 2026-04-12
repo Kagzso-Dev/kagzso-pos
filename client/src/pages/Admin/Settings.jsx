@@ -362,6 +362,9 @@ const Settings = () => {
                                 <option value="EUR">EUR (€)</option>
                             </select>
                         </Field>
+                        <Field label="Currency Symbol">
+                            <input type="text" name="currencySymbol" value={generalConfig.currencySymbol} onChange={handleChange} maxLength={3} className={inputCls} />
+                        </Field>
                         <Field label="GST / VAT No.">
                             <input type="text" name="gstNumber" value={generalConfig.gstNumber} onChange={handleChange} className={inputCls} />
                         </Field>

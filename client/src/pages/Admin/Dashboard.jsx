@@ -3,7 +3,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import {
-    TrendingUp, TrendingDown, ShoppingBag, Clock, DollarSign,
+    TrendingUp, TrendingDown, ShoppingBag, Clock, DollarSign, IndianRupee,
     Download, RefreshCw, ChevronDown, FileText,
     Layers, Utensils, Package, LogOut
 } from 'lucide-react';
@@ -293,7 +293,7 @@ const AdminDashboard = () => {
         const ordersData = [
             ['Order ID', 'Type', 'Items', 'Status', 'Date', 'Amount'],
             ...orders.map(o => [
-                o.orderNumber,
+                `${o.orderType === 'dine-in' ? 'DI' : 'TK'}-${String(o.orderNumber).startsWith('ORD-') ? String(o.orderNumber).replace('ORD-', '') : o.orderNumber}`,
                 o.orderType,
                 o.items?.length ?? 0,
                 o.orderStatus,
@@ -375,7 +375,7 @@ const AdminDashboard = () => {
                             title="Total Revenue (30d)"
                             value={formatPrice(totalRevenue)}
                             subtitle={null}
-                            icon={DollarSign}
+                            icon={settings?.currencySymbol === '₹' ? IndianRupee : DollarSign}
                             color="orange"
                             badge={
                                 <div className="flex flex-col items-end gap-1">
@@ -486,7 +486,7 @@ const AdminDashboard = () => {
                                             <td className="px-5 py-4 font-black text-[var(--theme-text-main)] whitespace-nowrap text-xs sm:text-sm tracking-tight">
                                                 <div className="flex items-center gap-2">
                                                     {isRecent && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />}
-                                                    {String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                                                    {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                                                 </div>
                                             </td>
                                             <td className="px-5 py-4 hidden xs:table-cell">

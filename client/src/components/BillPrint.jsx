@@ -11,6 +11,10 @@ export const printBill = (order, formatPrice, settings = {}, isKOT = false, filt
     const gstNumber = settings.gstNumber || '';
     const sgstRate = settings.sgst || 0;
     const cgstRate = settings.cgst || 0;
+    
+    const orderNum = order.orderType === 'dine-in' ? 'DINE' : 'TK';
+    const ordNum = String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber;
+    const displayOrderNumber = `${orderNum}-${ordNum}`;
 
     const date = new Date(order.createdAt).toLocaleString('en-IN', {
         day: '2-digit',
@@ -38,7 +42,7 @@ export const printBill = (order, formatPrice, settings = {}, isKOT = false, filt
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>${filterNew ? 'NEW ITEMS' : (isKOT ? 'KOT' : 'BILL')} — ${order.orderNumber}</title>
+<title>${filterNew ? 'NEW ITEMS' : (isKOT ? 'KOT' : 'BILL')} — ${displayOrderNumber}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -72,7 +76,7 @@ ${!isKOT && address ? `<div class="center" style="font-size:10px;margin-top:2px;
 ${!isKOT && gstNumber ? `<div class="center" style="font-size:10px;margin-top:2px;font-weight:bold;">GSTIN: ${gstNumber}</div>` : ''}
 <div class="solid"></div>
 
-<div class="row"><span>${filterNew ? 'UPDATE' : (isKOT ? 'KOT' : 'BILL')}</span><span class="bold">${order.orderNumber}</span></div>
+<div class="row"><span>${filterNew ? 'UPDATE' : (isKOT ? 'KOT' : 'BILL')}</span><span class="bold">${displayOrderNumber}</span></div>
 <div class="row"><span>TOKEN</span><span class="bold">#${order.tokenNumber || '—'}</span></div>
 <div class="row"><span>TIME</span><span>${date}</span></div>
 <div class="row"><span>TYPE</span><span class="bold">${order.orderType?.toUpperCase()}</span></div>

@@ -56,8 +56,10 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
     const tColor = tokenColors[order.orderStatus] || 'bg-[var(--theme-bg-card)] border-[var(--theme-border)]';
     const isReady = order.orderStatus?.toLowerCase() === 'ready';
     const hasNewItems = order.items?.some(i => i.isNewlyAdded && i.status?.toUpperCase() === 'PENDING');
+    const isPaid = order.paymentStatus === 'paid';
 
     const borderColor =
+        order.paymentStatus === 'paid'         ? 'border-red-500' :
         hasNewItems                          ? 'border-[var(--status-pending)]' :
         order.orderStatus === 'pending'      ? 'border-[var(--status-pending)]' :
         order.orderStatus === 'accepted'     ? 'border-[var(--status-accepted)]' :
@@ -74,11 +76,11 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
         return (
             <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border-l-[6px] shadow-sm transition-all animate-fade-in ${tColor} ${borderColor} ${urgency ? 'ring-1 ring-red-500/30' : ''}`}>
                 <div className="w-32 shrink-0">
-                    <p className="text-sm font-black text-gray-900 leading-none">{order.orderNumber}</p>
+                    <p className="text-sm font-black text-gray-900 leading-none">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</p>
                     <div className="flex items-center gap-1.5 mt-1.5">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/50 border border-black/10 rounded-lg text-[10px] font-black text-gray-900">
                             <Utensils size={9} />
-                            {order.orderType === 'dine-in' ? `T${order.tableId?.number || order.tableId || '?'}` : `TK${order.tokenNumber}`}
+                            {order.orderType === 'dine-in' ? `T ${order.tableId?.number || order.tableId || '?'}` : `TK ${order.tokenNumber}`}
                         </span>
                     </div>
                 </div>
@@ -131,7 +133,7 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
                 {/* Row 1: order number + status badge */}
                 <div className="flex items-center justify-between mb-2">
                     <h3 className="text-[14px] font-black text-[var(--theme-text-main)] tracking-tight italic">
-                        {String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                        {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                     </h3>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                         {hasNewItems && <span className="text-[8px] font-black bg-orange-50 text-orange-600 border border-orange-200/50 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">+New</span>}
@@ -142,11 +144,11 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
                 <div className="flex items-center justify-between gap-1.5">
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-orange-500/5 border border-orange-500/10 rounded-lg text-[10px] font-black text-orange-600 truncate max-w-[60%]">
                         <Utensils size={9} />
-                        {order.orderType === 'dine-in' ? `T${order.tableId?.number || order.tableId || '?'}` : `TK${order.tokenNumber || '?'}`}
+                        {order.orderType === 'dine-in' ? `T ${order.tableId?.number || order.tableId || '?'}` : `TK ${order.tokenNumber || '?'}`}
                     </div>
                     <div className={`flex items-center gap-1 text-[10px] font-bold shrink-0 ${urgency ? 'text-red-500 animate-pulse' : 'text-[var(--theme-text-muted)]'}`}>
                         <Clock size={10} strokeWidth={3} />
-                        {elapsed.replace(' ', '')}
+                        {elapsed}
                     </div>
                 </div>
             </div>
@@ -280,7 +282,7 @@ const KitchenTokenCard = ({ order, onClick }) => {
                     {order.orderStatus}
                 </span>
                 {/* floating order # */}
-                <span className="absolute top-6 -left-0.5 text-[7px] font-black opacity-30 tracking-tight leading-none pointer-events-none">{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}</span>
+                <span className="absolute top-6 -left-0.5 text-[7px] font-black opacity-30 tracking-tight leading-none pointer-events-none">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</span>
             </div>
 
             {/* Acceptance Icon (Floating Status Advancer) */}
@@ -302,8 +304,8 @@ const KitchenTokenCard = ({ order, onClick }) => {
             <div className="flex-1 flex flex-col items-center justify-center w-full min-h-0 pt-2" onClick={e => e.stopPropagation()}>
                 <span className="text-xl sm:text-2xl font-black leading-none tracking-tight text-center px-1 break-words w-full truncate group-hover:scale-105 transition-transform">
                     {order.orderType === 'dine-in'
-                        ? `T${order.tableId?.number || order.tableId || '?'}`
-                        : `TK${order.tokenNumber || '?'}`}
+                        ? `T ${order.tableId?.number || order.tableId || '?'}`
+                        : `TK ${order.tokenNumber || '?'}`}
                 </span>
             </div>
 
@@ -330,7 +332,7 @@ const KitchenDashboard = () => {
     const [detailsModal, setDetailsModal] = useState({ isOpen: false, order: null });
     const [isCardView, setIsCardView] = useState(() => localStorage.getItem('kitchenCardView') === 'true');
     const [showTables, setShowTables] = useState(false);
-    const { user, socket, settings } = useContext(AuthContext);
+    const { user, socket, settings, formatOrderNumber } = useContext(AuthContext);
     const announcedOrders = useRef(new Set());
     const isFirstLoad = useRef(true);
 
@@ -710,7 +712,7 @@ const KitchenDashboard = () => {
                     order={detailsModal.order}
                     isOpen={detailsModal.isOpen}
                     onClose={() => setDetailsModal({ isOpen: false, order: null })}
-                    formatPrice={(p) => `₹${p}`}
+                    formatPrice={(p) => `${settings.currencySymbol || '₹'}${p}`}
                     onCancelItem={(o, i) => {
                         setDetailsModal({ isOpen: false, order: null });
                         setCancelModal({ isOpen: true, order: o, item: i });

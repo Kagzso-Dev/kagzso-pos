@@ -241,7 +241,14 @@ export const AuthProvider = ({ children }) => {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const formatPrice = (amount) => {
-        return `${settings.currencySymbol}${(amount || 0).toFixed(0)}`;
+        const value = amount || 0;
+        return `${settings.currencySymbol}${value % 1 === 0 ? value.toFixed(0) : value.toFixed(2)}`;
+    };
+
+    const formatOrderNumber = (order) => {
+        const num = order.orderNumber?.replace('ORD-', '') || order.orderNumber || '';
+        const prefix = order.orderType === 'takeaway' ? 'TK' : order.orderType === 'dine-in' ? 'DI' : 'ORD';
+        return `${prefix}-${num}`;
     };
 
     const role = user?.role || null;
@@ -259,6 +266,7 @@ export const AuthProvider = ({ children }) => {
             settings,
             fetchSettings,
             formatPrice,
+            formatOrderNumber,
             role,
             isAdmin,
         }}>

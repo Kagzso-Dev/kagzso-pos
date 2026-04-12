@@ -64,6 +64,7 @@ const OrderDetailsModal = ({
     const isPaid = order?.paymentStatus === 'paid';
     const isCompleted = order?.orderStatus === 'completed';
     const isCancelled = order?.orderStatus === 'cancelled';
+    const isPaymentOngoing = order?.orderStatus === 'payment';
     const isReady = order?.orderStatus === 'ready' && 
                     !order?.isPartiallyReady && 
                     (order?.items || []).every(i => ['READY', 'CANCELLED'].includes(i.status?.toUpperCase()));
@@ -136,9 +137,11 @@ const OrderDetailsModal = ({
                         flex flex-col items-center justify-center 
                         min-w-[50px] xs:min-w-[65px] h-[50px] xs:h-[65px] 
                         rounded-2xl border-2 shadow-2xl transition-all duration-500 group relative overflow-hidden shrink-0
-                        ${order.orderType === 'dine-in' 
-                            ? 'bg-gradient-to-br from-orange-400/20 to-orange-600/10 border-orange-500/30 text-orange-600 shadow-orange-500/10' 
-                            : 'bg-gradient-to-br from-blue-400/20 to-blue-600/10 border-blue-500/30 text-blue-600 shadow-blue-500/10'}
+                        ${isPaid 
+                            ? 'bg-gradient-to-br from-red-500/20 to-red-700/10 border-red-500/30 text-red-600 shadow-red-500/10'
+                            : order.orderType === 'dine-in' 
+                                ? 'bg-gradient-to-br from-orange-400/20 to-orange-600/10 border-orange-500/30 text-orange-600 shadow-orange-500/10' 
+                                : 'bg-gradient-to-br from-blue-400/20 to-blue-600/10 border-blue-500/30 text-blue-600 shadow-blue-500/10'}
                     `}>
                         <div className="absolute inset-0 bg-white/5 group-hover:bg-transparent transition-colors duration-500" />
                         <span className="text-[22px] xs:text-[34px] font-black leading-none tracking-tighter z-10">
@@ -153,8 +156,8 @@ const OrderDetailsModal = ({
                     </div>
 
                     <div className="flex-1 flex flex-col gap-0.5 xs:gap-1 min-w-0">
-                        <h2 className="text-[18px] xs:text-[28px] font-black uppercase tracking-tighter text-[var(--theme-text-main)] truncate leading-none">
-                            {String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                        <h2 className={`text-[18px] xs:text-[28px] font-black uppercase tracking-tighter truncate leading-none ${isPaid ? 'text-red-700' : 'text-[var(--theme-text-main)]'}`}>
+                            {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                         </h2>
                         
                         <div className="flex items-center gap-1.5 xs:gap-2.5 flex-wrap mt-1">
@@ -165,7 +168,7 @@ const OrderDetailsModal = ({
                                     {order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED').length} Items
                                 </span>
                             </div>
-                            <span className={`px-2 xs:px-3 py-0.5 xs:py-1 rounded-lg xs:rounded-xl text-[9px] xs:text-[10px] font-black uppercase tracking-tight xs:tracking-wider border shadow-sm whitespace-nowrap ${isPaid ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-500 animate-pulse-subtle'}`}>
+                            <span className={`px-2 xs:px-3 py-0.5 xs:py-1 rounded-lg xs:rounded-xl text-[9px] xs:text-[10px] font-black uppercase tracking-tight xs:tracking-wider border shadow-sm whitespace-nowrap ${isPaid ? 'bg-red-600 text-white border-red-700' : 'bg-rose-500/10 border-rose-500/20 text-rose-500 animate-pulse-subtle'}`}>
                                 {isPaid ? '• Paid' : '• Unpaid'}
                             </span>
                             <div className="flex items-center gap-1.5 text-[var(--theme-text-muted)] ml-auto bg-[var(--theme-bg-dark)]/30 px-2 xs:px-3 py-0.5 xs:py-1 rounded-lg xs:rounded-xl border border-[var(--theme-border)]/50">
@@ -290,10 +293,10 @@ const OrderDetailsModal = ({
                             <div className="flex flex-col w-full overflow-hidden">
                                 <span className="text-[10px] xs:text-[12px] font-black uppercase tracking-wider xs:tracking-[0.3em] text-orange-500 leading-none mb-1 xs:mb-2 whitespace-nowrap">Grand Total</span>
                                 <div className="flex items-baseline gap-1 xs:gap-1.5 flex-wrap">
+                                    <span className="text-xs xs:text-base font-black text-orange-500 opacity-60 leading-none">{formatPrice(order.finalAmount).replace(/[\d.,\s]/g, '')}</span>
                                     <span className="text-[24px] xs:text-[36px] font-black tracking-tighter leading-none tabular-nums text-[var(--theme-text-main)]">
                                         {formatPrice(order.finalAmount).replace(/[^\d.,]/g, '')}
                                     </span>
-                                    <span className="text-xs xs:text-base font-black text-orange-500 opacity-60 leading-none">{formatPrice(order.finalAmount).replace(/[\d.,\s]/g, '')}</span>
                                 </div>
                             </div>
                         </div>
@@ -307,7 +310,7 @@ const OrderDetailsModal = ({
                             <span className="text-[9px] font-bold text-orange-500 opacity-70 uppercase tracking-widest">{order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED').length} Total</span>
                         </div>
                         <div className="flex items-center gap-1.5 xs:gap-2">
-                            {!isCancelled && !isPaid && onCancelOrder && (
+                            {!isCancelled && !isPaid && !isReady && !isPaymentOngoing && onCancelOrder && (
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); onCancelOrder(order); }}
                                     className="px-2.5 xs:px-4 py-1.5 xs:py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white text-[9px] xs:text-[10px] font-black rounded-lg xs:rounded-xl border border-red-500/20 shadow-sm flex items-center gap-1.5 uppercase transition-all active:scale-95"
@@ -316,7 +319,7 @@ const OrderDetailsModal = ({
                                     <X size={12} strokeWidth={3} /> <span className="hidden xs:inline">Cancel Order</span><span className="xs:hidden">Cancel</span>
                                 </button>
                             )}
-                            {userRole === 'waiter' && !isCancelled && !isPaid && (
+                            {userRole === 'waiter' && !isCancelled && !isPaid && !isPaymentOngoing && (
                                 <button onClick={() => navigate('/dine-in', { state: { orderId: order._id } })} className="px-2.5 xs:px-4 py-1.5 xs:py-2 bg-orange-500 hover:bg-orange-600 text-white text-[9px] xs:text-[10px] font-black rounded-lg xs:rounded-xl shadow-lg shadow-orange-500/20 flex items-center gap-1.5 uppercase transition-all active:scale-95">
                                     <Plus size={12} strokeWidth={3} /> <span className="hidden xs:inline">Add Item</span><span className="xs:hidden">Add</span>
                                 </button>
@@ -356,7 +359,7 @@ const OrderDetailsModal = ({
                                     <div className="flex items-center gap-2 xs:gap-4 ml-2">
                                         <p className="text-[13px] xs:text-[15px] font-black tabular-nums text-[var(--theme-text-main)] tracking-tight">{formatPrice(item.price * item.quantity)}</p>
 
-                                        {(userRole === 'waiter' || userRole === 'admin') && onCancelItem && !cancelled && (
+                                        {(userRole === 'waiter' || userRole === 'admin') && onCancelItem && !cancelled && !isPaymentOngoing && (
                                             <button 
                                                 disabled={item.status?.toUpperCase() !== 'PENDING'}
                                                 onClick={() => onCancelItem(order, item)} 
@@ -422,7 +425,7 @@ const OrderDetailsModal = ({
                                 <Printer size={32} className="text-orange-500 mb-2" />
                                 <h4 className="text-lg font-black uppercase tracking-tight">Print Ticket?</h4>
                                 <p className="text-[10px] text-gray-500 font-bold uppercase">
-                                    {String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                                    {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                                 </p>
                             </div>
                             <div className="grid grid-cols-2 border-t border-gray-100">
@@ -477,7 +480,7 @@ const OrderDetailsModal = ({
                             <div className="p-6 flex flex-col items-center text-center gap-1.5 text-black">
                                 <h4 className="text-[17px] font-black uppercase tracking-tight">Print Ticket?</h4>
                                 <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">
-                                    {String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                                    {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                                 </p>
                             </div>
                             <div className="grid grid-cols-2 border-t border-gray-100">

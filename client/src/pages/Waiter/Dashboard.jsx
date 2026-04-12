@@ -40,24 +40,27 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
     const elapsed = useElapsed(order.createdAt);
     const urgency = (Date.now() - new Date(order.createdAt)) > 600000;
     const isReady = order.orderStatus?.toLowerCase() === 'ready';
+    const isPaid = order.paymentStatus === 'paid';
 
     const bgColor =
-        order.orderStatus === 'pending' ? 'bg-orange-500/10 border-orange-500/30' :
-            order.orderStatus === 'accepted' ? 'bg-blue-500/10 border-blue-500/30' :
-                order.orderStatus === 'preparing' ? 'bg-indigo-500/10 border-indigo-500/30' :
-                    order.orderStatus === 'ready' ? 'bg-emerald-500/10 border-emerald-500/40' :
-                        order.orderStatus === 'readyToServe' ? 'bg-blue-500/10 border-blue-500/30' :
-                            order.orderStatus === 'payment' ? 'bg-red-500/10 border-red-500/30' :
-                                'bg-[var(--theme-bg-dark)] border-[var(--theme-border)]';
+        order.paymentStatus === 'paid' ? 'bg-red-500/10 border-red-500/30' :
+            order.orderStatus === 'pending' ? 'bg-orange-500/10 border-orange-500/30' :
+                order.orderStatus === 'accepted' ? 'bg-blue-500/10 border-blue-500/30' :
+                    order.orderStatus === 'preparing' ? 'bg-indigo-500/10 border-indigo-500/30' :
+                        order.orderStatus === 'ready' ? 'bg-emerald-500/10 border-emerald-500/40' :
+                            order.orderStatus === 'readyToServe' ? 'bg-blue-500/10 border-blue-500/30' :
+                                order.orderStatus === 'payment' ? 'bg-red-500/10 border-red-500/30' :
+                                    'bg-[var(--theme-bg-dark)] border-[var(--theme-border)]';
 
     const borderAccent =
-        order.orderStatus === 'pending' ? 'border-l-orange-500' :
-            order.orderStatus === 'accepted' ? 'border-l-blue-500' :
-                order.orderStatus === 'preparing' ? 'border-l-indigo-500' :
-                    order.orderStatus === 'ready' ? 'border-l-emerald-500' :
-                        order.orderStatus === 'readyToServe' ? 'border-l-blue-500' :
-                            order.orderStatus === 'payment' ? 'border-l-red-500' :
-                                'border-l-[var(--theme-text-muted)]';
+        order.paymentStatus === 'paid' ? 'border-l-red-500' :
+            order.orderStatus === 'pending' ? 'border-l-orange-500' :
+                order.orderStatus === 'accepted' ? 'border-l-blue-500' :
+                    order.orderStatus === 'preparing' ? 'border-l-indigo-500' :
+                        order.orderStatus === 'ready' ? 'border-l-emerald-500' :
+                            order.orderStatus === 'readyToServe' ? 'border-l-blue-500' :
+                                order.orderStatus === 'payment' ? 'border-l-red-500' :
+                                    'border-l-[var(--theme-text-muted)]';
 
     const visibleItems = order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED') || [];
 
@@ -71,7 +74,7 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
             <div className="px-2 pt-2.5 pb-2 border-b border-black/[0.04]">
                 <div className="flex items-center justify-between gap-1 mb-1">
                     <h3 className="text-[13px] font-black text-[var(--theme-text-main)] tracking-tight leading-none truncate pr-1">
-                        {String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                        {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                     </h3>
                     <StatusBadge status={order.orderStatus} items={order.items || []} size="xs" />
                 </div>
@@ -81,11 +84,11 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-white/60 border border-black/5 rounded-md text-[9px] font-black text-gray-700 shadow-sm truncate max-w-[50%]">
                             <Utensils size={8} className="text-orange-500 shrink-0" />
                             {order.orderType === 'dine-in'
-                                ? `T${order.tableId?.number || order.tableId || '?'}`
-                                : `TK${order.tokenNumber || '?'}`}
+                                ? `T ${order.tableId?.number || order.tableId || '?'}`
+                                : `TK ${order.tokenNumber || '?'}`}
                         </span>
                         <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold shrink-0 ${urgency ? 'text-red-600 bg-red-100 px-1 py-0.5 rounded-md' : 'text-gray-400'}`}>
-                            <Clock size={8} />{elapsed.replace(' ', '')}
+                            <Clock size={8} />{elapsed}
                         </span>
                     </div>
                 </div>
@@ -121,21 +124,24 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
 /* ── Order Card (List box style) ─────────────────────────────────────────── */
 const OrderCard = memo(({ order, formatPrice }) => {
     const isReady = order.orderStatus?.toLowerCase() === 'ready';
+    const isPaid = order.paymentStatus === 'paid';
     const borderColor =
-        order.orderStatus === 'pending' ? 'border-l-orange-500' :
-            order.orderStatus === 'accepted' ? 'border-l-blue-500' :
-                order.orderStatus === 'preparing' ? 'border-l-indigo-500' :
-                    order.orderStatus === 'readyToServe' ? 'border-l-blue-500' :
-                        order.orderStatus === 'payment' ? 'border-l-red-500' :
-                            'border-l-red-500';
+        order.paymentStatus === 'paid' ? 'border-l-red-500' :
+            order.orderStatus === 'pending' ? 'border-l-orange-500' :
+                order.orderStatus === 'accepted' ? 'border-l-blue-500' :
+                    order.orderStatus === 'preparing' ? 'border-l-indigo-500' :
+                        order.orderStatus === 'readyToServe' ? 'border-l-blue-500' :
+                            order.orderStatus === 'payment' ? 'border-l-red-500' :
+                                'border-l-red-500';
     const bgColor =
-        order.orderStatus === 'pending' ? 'bg-orange-500/5 border-orange-500/30' :
-            order.orderStatus === 'accepted' ? 'bg-blue-500/5 border-blue-500/30' :
-                order.orderStatus === 'preparing' ? 'bg-indigo-500/5 border-indigo-500/30' :
-                    order.orderStatus === 'ready' ? 'bg-emerald-500/5 border-emerald-500/40' :
-                        order.orderStatus === 'readyToServe' ? 'bg-blue-500/5 border-blue-500/30' :
-                            order.orderStatus === 'payment' ? 'bg-red-500/5 border-red-500/30' :
-                                'bg-[var(--theme-bg-card)]';
+        order.paymentStatus === 'paid' ? 'bg-red-500/5 border-red-500/30' :
+            order.orderStatus === 'pending' ? 'bg-orange-500/5 border-orange-500/30' :
+                order.orderStatus === 'accepted' ? 'bg-blue-500/5 border-blue-500/30' :
+                    order.orderStatus === 'preparing' ? 'bg-indigo-500/5 border-indigo-500/30' :
+                        order.orderStatus === 'ready' ? 'bg-emerald-500/5 border-emerald-500/40' :
+                            order.orderStatus === 'readyToServe' ? 'bg-blue-500/5 border-blue-500/30' :
+                                order.orderStatus === 'payment' ? 'bg-red-500/5 border-red-500/30' :
+                                    'bg-[var(--theme-bg-card)]';
 
     return (
         <div className={`
@@ -145,7 +151,7 @@ const OrderCard = memo(({ order, formatPrice }) => {
         `}>
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-black text-[var(--theme-text-main)] tracking-tight">{order.orderNumber}</span>
+                    <span className="text-sm font-black text-[var(--theme-text-main)] tracking-tight">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-white/60 dark:bg-white/10 border border-[var(--theme-border)] text-[10px] font-black text-[var(--theme-text-main)] whitespace-nowrap shadow-sm">
                         {order.orderType === 'dine-in'
                             ? `Table ${order.tableId?.number || order.tableId || '?'}`
@@ -244,9 +250,9 @@ const TokenSquare = memo(({ order, onClick, isSelected }) => {
                 </div>
                 <div className="flex flex-col items-center py-1.5">
                     <span className="text-[10px] font-black text-black tracking-tight leading-none">
-                        #{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
+                        {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                     </span>
-                    <span className="text-[6px] font-black text-black uppercase tracking-widest mt-0.5">ORDER</span>
+                    <span className="text-[6px] font-black text-black uppercase tracking-widest mt-0.5">{order.orderType === 'dine-in' ? 'DINE IN' : 'TAKEAWAY'}</span>
                 </div>
             </div>
 
@@ -302,7 +308,7 @@ const WaiterDashboard = () => {
     const [cancelModal, setCancelModal] = useState({ isOpen: false, order: null, item: null });
     const [refreshing, setRefreshing] = useState(false);
     const [isProductionMode, setIsProductionMode] = useState(false);
-    const { user, socket, formatPrice, settings } = useContext(AuthContext);
+    const { user, socket, formatPrice, formatOrderNumber, settings } = useContext(AuthContext);
 
     useEffect(() => {
         const local = localStorage.getItem('isProductionMode');
