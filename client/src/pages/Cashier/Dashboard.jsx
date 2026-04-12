@@ -249,7 +249,6 @@ const CashierDashboard = () => {
     const [showInvoice, setShowInvoice] = useState(false); // mobile panel toggle
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
-    const [showPrintConfirm, setShowPrintConfirm] = useState(false);
     const [filterType, setFilterType] = useState('all'); // 'all' | 'dine-in' | 'takeaway'
     const [cancelModal, setCancelModal] = useState({ isOpen: false, order: null });
     const [isCardView, setIsCardView] = useState(() => localStorage.getItem('cashierCardView') !== 'false');
@@ -633,7 +632,7 @@ const CashierDashboard = () => {
                                         <div className="flex gap-2 flex-wrap">
 
                                             <button
-                                                onClick={() => setShowPrintConfirm(true)}
+                                                onClick={() => printBill(selectedOrder, formatPrice, settings)}
                                                 className="flex items-center gap-2 px-4 md:px-5 py-3 bg-[var(--theme-bg-hover)] hover:bg-[var(--theme-border)] text-[var(--theme-text-main)] rounded-xl font-semibold text-sm transition-colors min-h-[44px] border border-[var(--theme-border)]"
                                             >
                                                 <Printer size={17} />
