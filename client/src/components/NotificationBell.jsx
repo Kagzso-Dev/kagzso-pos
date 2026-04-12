@@ -210,7 +210,7 @@ const NotificationBell = () => {
             </button>
 
             {isOpen && (
-                <div className="absolute top-full right-[-1rem] sm:right-0 mt-2 w-[calc(100vw-2rem)] sm:w-[380px] max-w-[400px] bg-[var(--theme-bg-card)] border border-[var(--theme-border)] rounded-2xl shadow-2xl z-50 animate-fade-in overflow-hidden">
+                <div className="fixed inset-x-4 top-20 sm:absolute sm:top-full sm:right-0 sm:inset-x-auto sm:mt-2 w-auto sm:w-[380px] bg-[var(--theme-bg-card)] border border-[var(--theme-border)] rounded-2xl shadow-2xl z-[100] animate-fade-in overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-bg-hover)]">
                         <div className="flex items-center gap-2">
                             <Bell size={16} className="text-orange-400" />

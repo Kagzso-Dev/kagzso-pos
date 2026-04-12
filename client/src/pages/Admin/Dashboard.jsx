@@ -322,7 +322,6 @@ const AdminDashboard = () => {
                     </h1>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    <NotificationBell />
                     {/* Mobile: Logout | Desktop/Tablet: Refresh */}
 
                     <button
