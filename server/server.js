@@ -56,7 +56,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('/{*splat}', cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
 app.use(helmet({
@@ -226,8 +226,17 @@ app.get('/health', async (req, res) => {
 
 // ─── Serve React Frontend ─────────────────────────────────────────────────────
 if (hasFrontend) {
-    app.use(express.static(CLIENT_DIST, { maxAge: '1d' }));
-    app.get('/{*splat}', (_req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')));
+    app.use(express.static(CLIENT_DIST, { 
+        maxAge: '1d',
+        setHeaders: (res, path) => {
+            if (path.endsWith('.html')) {
+                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Expires', '0');
+            }
+        }
+    }));
+    app.get('*', (_req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')));
 } else {
     app.get('/', (req, res) => res.json({ status: 'ok', message: 'API running. MySQL only.' }));
 }
