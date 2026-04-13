@@ -59,13 +59,13 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
     const isPaid = order.paymentStatus === 'paid';
 
     const borderColor =
-        order.paymentStatus === 'paid'         ? 'border-red-500' :
-        hasNewItems                          ? 'border-[var(--status-pending)]' :
-        order.orderStatus === 'pending'      ? 'border-[var(--status-pending)]' :
-        order.orderStatus === 'accepted'     ? 'border-[var(--status-accepted)]' :
-        order.orderStatus === 'preparing'    ? 'border-[var(--status-preparing)]' :
-        order.orderStatus === 'ready'        ? 'border-[var(--status-ready)]' :
-        'border-[var(--theme-border)]';
+        order.paymentStatus === 'paid' ? 'border-red-500' :
+            hasNewItems ? 'border-[var(--status-pending)]' :
+                order.orderStatus === 'pending' ? 'border-[var(--status-pending)]' :
+                    order.orderStatus === 'accepted' ? 'border-[var(--status-accepted)]' :
+                        order.orderStatus === 'preparing' ? 'border-[var(--status-preparing)]' :
+                            order.orderStatus === 'ready' ? 'border-[var(--status-ready)]' :
+                                'border-[var(--theme-border)]';
 
     /* ── LIST ROW ───────────────────────────────────────────────────────── */
     if (isList) {
@@ -101,15 +101,21 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
                             <button
                                 onClick={async (e) => {
                                     e.stopPropagation();
-                                    if(isUpdatingOrder) return;
+                                    if (isUpdatingOrder) return;
                                     setIsUpdatingOrder(true);
                                     try { await onUpdateStatus(order._id, 'ready'); } finally { setIsUpdatingOrder(false); }
                                 }} disabled={isUpdatingOrder} className="px-5 flex items-center justify-center min-w-[80px] h-9 text-white text-[11px] font-black rounded-xl active:scale-95 transition-all bg-emerald-600 shadow-lg shadow-emerald-500/20">
                                 {isUpdatingOrder ? <Loader2 size={14} className="animate-spin" /> : 'MARK READY ✓'}
                             </button>
                         )}
-                        {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' && (order.orderStatus !== 'ready' || userRole === 'admin') && (
-                            <button onClick={(e) => { e.stopPropagation(); onCancel(order); }} className="p-1.5 hover:bg-red-500/10 rounded-lg text-red-400 transition-all"><XCircle size={15} /></button>
+                        {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' &&
+                         order.orderStatus !== 'ready' && (userRole === 'kitchen' || userRole === 'admin') && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onCancel(order); }}
+                                className="w-9 h-9 flex items-center justify-center hover:bg-red-500/15 rounded-xl text-red-500/50 hover:text-red-500 transition-all border border-transparent hover:border-red-500/20"
+                            >
+                                <XCircle size={16} />
+                            </button>
                         )}
                     </div>
                 )}
@@ -167,15 +173,12 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
                                 {item.variant?.name && <span className="ml-1 text-[8px] opacity-60">({item.variant.name})</span>}
                             </p>
                         </div>
-                        {userRole === 'kitchen' || userRole === 'admin' ? (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onCancelItem(order, item); }}
-                                className="w-5 h-5 shrink-0 flex items-center justify-center rounded hover:bg-red-500/15 text-red-400/50 hover:text-red-500 transition-all"
-                                title="Cancel item"
-                            >
-                                <XCircle size={12} />
-                            </button>
-                        ) : null}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onCancelItem(order, item); }}
+                            className="w-5 h-5 flex items-center justify-center rounded bg-red-500/5 hover:bg-red-500/15 text-red-500/40 hover:text-red-500 transition-all border border-red-500/10"
+                        >
+                            <XCircle size={12} />
+                        </button>
                     </div>
                 ))}
 
@@ -188,9 +191,6 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
                                 <div key={item._id} className="flex items-center gap-2 text-[10px] font-medium text-[var(--theme-text-muted)]">
                                     <span className="w-3.5 h-3.5 flex items-center justify-center bg-emerald-500/10 text-emerald-600 text-[8px] font-black rounded ring-1 ring-emerald-500/20">{item.quantity}</span>
                                     <span className="line-through">{item.name}</span>
-                                    <span className="w-4 h-4 shrink-0 flex items-center justify-center text-gray-300" title="Cannot cancel - already ready">
-                                        <XCircle size={10} />
-                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -203,10 +203,10 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
                 <span className="text-[10px] font-black text-[var(--theme-text-muted)] uppercase tracking-tighter shrink-0 opacity-60">
                     {order.orderType === 'dine-in' ? 'DINE' : 'TAKE'}
                 </span>
-                
+
                 <div className="flex items-center gap-1.5 min-w-0">
-                    {(userRole === 'kitchen' || userRole === 'admin') && 
-                     ['pending', 'accepted', 'preparing'].includes(order.orderStatus?.toLowerCase()) ? (
+                    {(userRole === 'kitchen' || userRole === 'admin') &&
+                        ['pending', 'accepted', 'preparing'].includes(order.orderStatus?.toLowerCase()) ? (
                         <button
                             onClick={async (e) => {
                                 e.stopPropagation();
@@ -220,9 +220,11 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
                             {isUpdatingOrder ? <Loader2 size={12} className="animate-spin" /> : 'READY'}
                         </button>
                     ) : null}
-                    
+
                     {order.orderStatus !== 'completed' && order.orderStatus !== 'cancelled' &&
-                     order.orderStatus !== 'ready' && (userRole === 'kitchen' || userRole === 'admin') && (
+                     order.orderStatus !== 'ready' && 
+                     order.items?.every(i => i.status?.toUpperCase() !== 'READY') && 
+                     (userRole === 'kitchen' || userRole === 'admin') && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onCancel(order); }}
                             className="w-7 h-7 flex items-center justify-center hover:bg-red-500/15 rounded-lg text-red-500/50 hover:text-red-500 transition-all border border-transparent hover:border-red-500/20 shrink-0"
@@ -241,9 +243,9 @@ const KitchenTokenCard = ({ order, onClick }) => {
     const urgency = (Date.now() - new Date(order.createdAt)) > 600000;
     const isReady = order.orderStatus?.toLowerCase() === 'ready';
     const sColor =
-        order.orderStatus === 'pending'   ? 'bg-orange-500/10 border-orange-500 text-orange-600' :
-        order.orderStatus === 'ready'     ? 'bg-emerald-600/10 border-emerald-500 text-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.3)]' :
-        'bg-gray-500/10 border-gray-500 text-gray-500';
+        order.orderStatus === 'pending' ? 'bg-orange-500/10 border-orange-500 text-orange-600' :
+            order.orderStatus === 'ready' ? 'bg-emerald-600/10 border-emerald-500 text-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.3)]' :
+                'bg-gray-500/10 border-gray-500 text-gray-500';
 
     const [isUpdating, setIsUpdating] = useState(false);
 
@@ -251,7 +253,7 @@ const KitchenTokenCard = ({ order, onClick }) => {
         e.stopPropagation();
         if (isUpdating || order.orderStatus === 'ready') return;
         setIsUpdating(true);
-        try { await onClick(order, 'ready'); } 
+        try { await onClick(order, 'ready'); }
         finally { setIsUpdating(false); }
     };
 
@@ -287,7 +289,7 @@ const KitchenTokenCard = ({ order, onClick }) => {
 
             {/* Acceptance Icon (Floating Status Advancer) */}
             {!isReady && !isUpdating && (
-                <div 
+                <div
                     onClick={handleAdvance}
                     className="absolute bottom-1 right-1 w-6 h-6 rounded-lg flex items-center justify-center text-white shadow-lg active:scale-125 transition-all z-20 border border-white/20 bg-emerald-600"
                 >
@@ -352,22 +354,22 @@ const KitchenDashboard = () => {
         }
 
         // Identify takeaway orders that just transitioned to 'ready'
-        const newlyReadyTakeaways = orders.filter(o => 
-            o.orderType === 'takeaway' && 
-            o.orderStatus?.toLowerCase() === 'ready' && 
+        const newlyReadyTakeaways = orders.filter(o =>
+            o.orderType === 'takeaway' &&
+            o.orderStatus?.toLowerCase() === 'ready' &&
             !announcedOrders.current.has(o._id)
         );
 
         if (newlyReadyTakeaways.length > 0) {
             newlyReadyTakeaways.forEach(o => {
                 announcedOrders.current.add(o._id);
-                
+
                 const token = o.tokenNumber || 'Unknown';
-                const itemsCount = o.items?.reduce((sum, item) => 
+                const itemsCount = o.items?.reduce((sum, item) =>
                     sum + (item.status?.toUpperCase() !== 'CANCELLED' ? (item.quantity || 1) : 0), 0) || 0;
-                
+
                 const text = `Token ${token}, ${itemsCount} items, takeaway order ready`;
-                
+
                 // Slight delay and then speak as requested
                 setTimeout(() => {
                     if (!('speechSynthesis' in window)) return;
@@ -431,7 +433,7 @@ const KitchenDashboard = () => {
                         return [order, ...prev];
                     }
                 });
-                if (detailsModal.isOpen && detailsModal.order?._id === order._id && 
+                if (detailsModal.isOpen && detailsModal.order?._id === order._id &&
                     (order.orderStatus === 'completed' || order.orderStatus === 'cancelled' || order.kotStatus === 'Closed')) {
                     setDetailsModal({ isOpen: false, order: null });
                 }
@@ -461,6 +463,16 @@ const KitchenDashboard = () => {
         window.addEventListener('pos-refresh', fetchOrders);
         return () => window.removeEventListener('pos-refresh', fetchOrders);
     }, [user, socket, fetchOrders]);
+
+    // Auto-refresh every 10 seconds to ensure kitchen stays synced
+    useEffect(() => {
+        if (!user) return;
+        const interval = setInterval(() => {
+            fetchOrders();
+        }, 10000); 
+
+        return () => clearInterval(interval);
+    }, [user, fetchOrders]);
 
 
     const updateStatus = async (orderId, newStatus) => {
@@ -515,13 +527,13 @@ const KitchenDashboard = () => {
             : orders.filter(o => o.orderStatus === 'completed' || o.orderStatus === 'ready')
     )
 
-    .filter(o => settings?.takeawayEnabled !== false || o.orderType !== 'takeaway')
-    .filter(o => settings?.dineInEnabled   !== false || o.orderType !== 'dine-in')
-    .filter(o => {
-        const matchesType = filterType === 'all' || o.orderType === filterType;
-        const matchesStatus = !statusFilter || o.orderStatus === statusFilter;
-        return matchesType && matchesStatus;
-    });
+        .filter(o => settings?.takeawayEnabled !== false || o.orderType !== 'takeaway')
+        .filter(o => settings?.dineInEnabled !== false || o.orderType !== 'dine-in')
+        .filter(o => {
+            const matchesType = filterType === 'all' || o.orderType === filterType;
+            const matchesStatus = !statusFilter || o.orderStatus === statusFilter;
+            return matchesType && matchesStatus;
+        });
 
     return (
         <div className="flex flex-col gap-3 animate-fade-in pb-0 text-left flex-1 overflow-hidden min-h-0 h-full pt-2">
@@ -538,11 +550,10 @@ const KitchenDashboard = () => {
                                 <button
                                     key={t}
                                     onClick={() => setFilterType(t)}
-                                    className={`px-3 lg:px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${
-                                        filterType === t 
-                                            ? 'bg-orange-600 text-white shadow-md' 
+                                    className={`px-3 lg:px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${filterType === t
+                                            ? 'bg-orange-600 text-white shadow-md'
                                             : 'text-[var(--theme-text-muted)] hover:text-orange-500'
-                                    }`}
+                                        }`}
                                 >
                                     <span className="md:hidden lg:inline">{t === 'all' ? 'All Orders' : t === 'dine-in' ? 'Dine-In' : 'Takeaway'}</span>
                                     <span className="hidden md:inline lg:hidden">{t === 'all' ? 'All' : t === 'dine-in' ? 'Dine' : 'Take'}</span>
@@ -555,18 +566,16 @@ const KitchenDashboard = () => {
                         <button
                             onClick={() => setShowTables(!showTables)}
                             title={showTables ? "Collapse Stats" : "Expand Stats"}
-                            className={`w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl border transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-90 relative overflow-hidden group ${
-                                showTables 
-                                    ? 'bg-orange-500 border-orange-400 text-white shadow-md ring-2 ring-orange-500/20' 
+                            className={`w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl border transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-90 relative overflow-hidden group ${showTables
+                                    ? 'bg-orange-500 border-orange-400 text-white shadow-md ring-2 ring-orange-500/20'
                                     : 'bg-[var(--theme-bg-dark)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-orange-500'
-                            }`}
+                                }`}
                         >
-                            <ChevronLeft 
-                                size={16} 
-                                strokeWidth={3} 
-                                className={`transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                                    showTables ? 'rotate-180 scale-110' : 'rotate-0'
-                                }`} 
+                            <ChevronLeft
+                                size={16}
+                                strokeWidth={3}
+                                className={`transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showTables ? 'rotate-180 scale-110' : 'rotate-0'
+                                    }`}
                             />
                         </button>
 
@@ -602,11 +611,10 @@ const KitchenDashboard = () => {
                             <button
                                 key={t}
                                 onClick={() => setFilterType(t)}
-                                className={`flex items-center justify-center py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${
-                                    filterType === t 
-                                        ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20' 
+                                className={`flex items-center justify-center py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${filterType === t
+                                        ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20'
                                         : 'text-[var(--theme-text-muted)] hover:text-orange-500'
-                                }`}
+                                    }`}
                             >
                                 {t === 'all' ? 'All' : t === 'dine-in' ? 'Dine' : 'Take'}
                             </button>
@@ -622,17 +630,16 @@ const KitchenDashboard = () => {
             {/* ── Status View (Slide-down Counters) ───────────────────── */}
             <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showTables ? 'max-h-[200px] opacity-100 mb-6' : 'max-h-0 opacity-0 mb-0'}`}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[var(--theme-bg-card)] p-3 rounded-2xl border-2 border-[var(--theme-border)] shadow-xl">
-                        { [
-                            { key: 'pending', count: counts.pending, dot: 'bg-amber-500', label: 'New KOT', activeColor: 'text-amber-500', activeBg: 'bg-amber-500/10' },
-                            { key: 'ready', count: counts.ready, dot: 'bg-emerald-500', label: 'Ready', activeColor: 'text-emerald-500', activeBg: 'bg-emerald-500/10' },
-                        ].map(({ key, count, dot, label, activeColor, activeBg }, idx) => (
-                        <button 
-                            key={key} 
-                            onClick={() => setStatusFilter(f => f === key ? null : key)} 
+                    {[
+                        { key: 'pending', count: counts.pending, dot: 'bg-amber-500', label: 'New KOT', activeColor: 'text-amber-500', activeBg: 'bg-amber-500/10' },
+                        { key: 'ready', count: counts.ready, dot: 'bg-emerald-500', label: 'Ready', activeColor: 'text-emerald-500', activeBg: 'bg-emerald-500/10' },
+                    ].map(({ key, count, dot, label, activeColor, activeBg }, idx) => (
+                        <button
+                            key={key}
+                            onClick={() => setStatusFilter(f => f === key ? null : key)}
                             style={{ animationDelay: `${idx * 0.05}s`, animationFillMode: 'backwards' }}
-                            className={`group rounded-xl p-2.5 sm:p-3 flex flex-col items-center justify-center transition-all duration-300 border animate-in fade-in zoom-in-95 slide-in-from-top-2 ${
-                                statusFilter === key ? `${activeBg} border-transparent shadow-sm scale-95` : 'bg-[var(--theme-bg-dark)] border-[var(--theme-border)] hover:border-orange-500/30'
-                            }`}
+                            className={`group rounded-xl p-2.5 sm:p-3 flex flex-col items-center justify-center transition-all duration-300 border animate-in fade-in zoom-in-95 slide-in-from-top-2 ${statusFilter === key ? `${activeBg} border-transparent shadow-sm scale-95` : 'bg-[var(--theme-bg-dark)] border-[var(--theme-border)] hover:border-orange-500/30'
+                                }`}
                         >
                             <p className={`text-lg sm:text-2xl font-black tabular-nums ${statusFilter === key ? activeColor : 'text-[var(--theme-text-main)]'}`}>{count}</p>
                             <div className="flex items-center gap-1 mt-1">
@@ -650,94 +657,93 @@ const KitchenDashboard = () => {
 
             {/* ── KOT Grid — Isolated Scroll Container ──────────────── */}
             <div className="flex-1 min-h-0 kot-scroll rounded-2xl">
-            {loading ? (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-                    {Array(8).fill(0).map((_, i) => <div key={i} className="skeleton rounded-xl h-48" />)}
-                </div>
-            ) : displayOrders.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-[var(--theme-text-muted)]">
-                    {activeTab === 'active' ? (
-                        <>
-                            <ChefHat size={44} className="mb-2 opacity-20" />
-                            <h3 className="text-base font-extrabold text-[var(--theme-text-muted)]">Kitchen is clear!</h3>
-                            <p className="text-xs mt-1 opacity-70 tracking-tight">No open KOTs in the queue</p>
-                        </>
-                    ) : activeTab === 'cancelled' ? (
-                        <>
-                            <ChefHat size={56} className="mb-4 opacity-20" />
-                            <h3 className="text-xl font-bold text-[var(--theme-text-muted)]">No cancellations</h3>
-                            <p className="text-sm mt-1">Everything is running smoothly</p>
-                        </>
-                    ) : (
-                        <>
-                            <ChefHat size={56} className="mb-4 opacity-20" />
-                            <h3 className="text-xl font-bold text-[var(--theme-text-muted)]">No completed orders</h3>
-                            <p className="text-sm mt-1">Completed orders will appear here</p>
-                        </>
-                    )}
-                </div>
-            ) : (
-                <div className={`grid p-2 sm:p-5 pb-32 animate-fade-in ${
-                    isCardView
-                        ? 'grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2'
-                        : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 gap-2.5 sm:gap-5'
-                }`}>
-                    {displayOrders.map(order => (
-                        <div key={order._id} className="h-full transition-transform">
-                            {isCardView ? (
-                                <KitchenTokenCard
-                                    order={order}
-                                    onClick={(o, s) => s && updateStatus(o._id, s)}
-                                />
-                            ) : (
-                                <div className="h-full">
-                                    <KotTicket
+                {loading ? (
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
+                        {Array(8).fill(0).map((_, i) => <div key={i} className="skeleton rounded-xl h-48" />)}
+                    </div>
+                ) : displayOrders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-[var(--theme-text-muted)]">
+                        {activeTab === 'active' ? (
+                            <>
+                                <ChefHat size={44} className="mb-2 opacity-20" />
+                                <h3 className="text-base font-extrabold text-[var(--theme-text-muted)]">Kitchen is clear!</h3>
+                                <p className="text-xs mt-1 opacity-70 tracking-tight">No open KOTs in the queue</p>
+                            </>
+                        ) : activeTab === 'cancelled' ? (
+                            <>
+                                <ChefHat size={56} className="mb-4 opacity-20" />
+                                <h3 className="text-xl font-bold text-[var(--theme-text-muted)]">No cancellations</h3>
+                                <p className="text-sm mt-1">Everything is running smoothly</p>
+                            </>
+                        ) : (
+                            <>
+                                <ChefHat size={56} className="mb-4 opacity-20" />
+                                <h3 className="text-xl font-bold text-[var(--theme-text-muted)]">No completed orders</h3>
+                                <p className="text-sm mt-1">Completed orders will appear here</p>
+                            </>
+                        )}
+                    </div>
+                ) : (
+                    <div className={`grid p-2 sm:p-5 pb-32 animate-fade-in ${isCardView
+                            ? 'grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2'
+                            : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 gap-2.5 sm:gap-5'
+                        }`}>
+                        {displayOrders.map(order => (
+                            <div key={order._id} className="h-full transition-transform">
+                                {isCardView ? (
+                                    <KitchenTokenCard
                                         order={order}
-                                        onUpdateStatus={updateStatus}
-                                        onUpdateItemStatus={updateItemStatus}
-                                        onCancel={(o) => setCancelModal({ isOpen: true, order: o, item: null })}
-                                        onCancelItem={(o, i) => setCancelModal({ isOpen: true, order: o, item: i })}
-                                        userRole={user.role}
-                                        viewType="normal"
+                                        onClick={(o, s) => s && updateStatus(o._id, s)}
                                     />
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
+                                ) : (
+                                    <div className="h-full">
+                                        <KotTicket
+                                            order={order}
+                                            onUpdateStatus={updateStatus}
+                                            onUpdateItemStatus={updateItemStatus}
+                                            onCancel={(o) => setCancelModal({ isOpen: true, order: o, item: null })}
+                                            onCancelItem={(o, i) => setCancelModal({ isOpen: true, order: o, item: i })}
+                                            userRole={user.role}
+                                            viewType="normal"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
-    
-                <OrderDetailsModal
-                    order={detailsModal.order}
-                    isOpen={detailsModal.isOpen}
-                    onClose={() => setDetailsModal({ isOpen: false, order: null })}
-                    formatPrice={(p) => `${settings.currencySymbol || '₹'}${p}`}
-                    onCancelItem={(o, i) => {
-                        setDetailsModal({ isOpen: false, order: null });
-                        setCancelModal({ isOpen: true, order: o, item: i });
-                    }}
-                    onCancelOrder={(o) => {
-                        setDetailsModal({ isOpen: false, order: null });
-                        setCancelModal({ isOpen: true, order: o, item: null });
-                    }}
-                    userRole={user.role}
-                    settings={settings}
-                />
-    
-                <CancelOrderModal
-                    isOpen={cancelModal.isOpen}
-                    order={cancelModal.order}
-                    item={cancelModal.item}
-                    title={cancelModal.item ? "Cancel Item" : "Cancel Order"}
-                    onClose={() => setCancelModal({ isOpen: false, order: null, item: null })}
-                    onConfirm={handleCancelAction}
-                />
-    
 
-            </div>
-        );
-    };
-    
-    export default KitchenDashboard;
-    
+            <OrderDetailsModal
+                order={detailsModal.order}
+                isOpen={detailsModal.isOpen}
+                onClose={() => setDetailsModal({ isOpen: false, order: null })}
+                formatPrice={(p) => `${settings.currencySymbol || '₹'}${p}`}
+                onCancelItem={(o, i) => {
+                    setDetailsModal({ isOpen: false, order: null });
+                    setCancelModal({ isOpen: true, order: o, item: i });
+                }}
+                onCancelOrder={(o) => {
+                    setDetailsModal({ isOpen: false, order: null });
+                    setCancelModal({ isOpen: true, order: o, item: null });
+                }}
+                userRole={user.role}
+                settings={settings}
+            />
+
+            <CancelOrderModal
+                isOpen={cancelModal.isOpen}
+                order={cancelModal.order}
+                item={cancelModal.item}
+                title={cancelModal.item ? "Cancel Item" : "Cancel Order"}
+                onClose={() => setCancelModal({ isOpen: false, order: null, item: null })}
+                onConfirm={handleCancelAction}
+            />
+
+
+        </div>
+    );
+};
+
+export default KitchenDashboard;
+

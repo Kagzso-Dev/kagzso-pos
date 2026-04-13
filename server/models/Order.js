@@ -244,12 +244,15 @@ const Order = {
         const existingCgst = parseFloat(orderInfo.cgst) || 0;
         const existingSgstRate = existingSubtotal > 0 && existingSgst > 0 ? existingSgst / existingSubtotal : 0;
         const existingCgstRate = existingSubtotal > 0 && existingCgst > 0 ? existingCgst / existingSubtotal : 0;
-        const sgstRate = existingSgstRate > 0 ? existingSgstRate : settingsSgstRate;
-        const cgstRate = existingCgstRate > 0 ? existingCgstRate : settingsCgstRate;
+        const sgstRate = settingsSgstRate;
+        const cgstRate = settingsCgstRate;
         
-        const newTotalSgst = parseFloat((subtotalSum * sgstRate).toFixed(2));
-        const newTotalCgst = parseFloat((subtotalSum * cgstRate).toFixed(2));
-        const newFinal = parseFloat((subtotalSum + newTotalSgst + newTotalCgst - existingDiscount).toFixed(2));
+        const discValue = parseFloat(orderInfo.discount) || 0;
+        const discountedSubtotal = Math.max(0, subtotalSum - discValue);
+
+        const newTotalSgst = parseFloat((discountedSubtotal * sgstRate).toFixed(2));
+        const newTotalCgst = parseFloat((discountedSubtotal * cgstRate).toFixed(2));
+        const newFinal = parseFloat((discountedSubtotal + newTotalSgst + newTotalCgst).toFixed(2));
 
         await mysql.query(
             'UPDATE orders SET total_amount = ?, sgst = ?, cgst = ?, final_amount = ?, kot_status = "Open", order_status = "pending" WHERE id = ?',

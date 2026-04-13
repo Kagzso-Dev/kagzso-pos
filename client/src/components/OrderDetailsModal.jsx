@@ -103,16 +103,6 @@ const OrderDetailsModal = ({
                     </div>
 
                     <div className="flex items-center gap-2.5">
-                        {(order?.items || []).some(item => item.isNewlyAdded) && (
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); printBill(order, formatPrice, settings, true, true); }}
-                                className="w-10 h-10 flex items-center justify-center rounded-2xl bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white transition-all duration-300 active:scale-95 border border-blue-500/20 group relative shadow-sm"
-                                title="Print New Items KOT"
-                            >
-                                <Printer size={16} strokeWidth={3} />
-                                <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[7px] font-black px-2 py-0.5 rounded-full border-2 border-[var(--theme-bg-card)] shadow-[0_2px_10px_rgba(37,99,235,0.3)]">NEW</span>
-                            </button>
-                        )}
                         <button 
                             onClick={(e) => { e.stopPropagation(); printBill(order, formatPrice, settings); }}
                             className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--theme-bg-dark)]/50 text-[var(--theme-text-muted)] hover:text-orange-500 hover:bg-orange-500/10 transition-all duration-300 active:scale-95 border border-[var(--theme-border)] group shadow-sm"
@@ -219,14 +209,20 @@ const OrderDetailsModal = ({
                                      icon = <Check size={28} strokeWidth={3} className="scale-75 xs:scale-100" />;
                                      colorClass = "bg-orange-600 border-orange-500 text-white shadow-[0_10px_25px_rgba(249,115,22,0.3)] hover:scale-105 active:scale-95";
                                      enabled = true;
+                                 } else if (order.orderStatus === 'payment') {
+                                     label = "Billed";
+                                     icon = <Check size={28} strokeWidth={3} className="scale-75 xs:scale-100 opacity-50" />;
+                                     colorClass = "bg-orange-500/20 border-orange-500/30 text-orange-500/50 cursor-default";
                                  }
                              } else if (userRole === 'cashier' || userRole === 'admin') {
                                  if (order.orderStatus === 'payment') {
-                                     label = "Done";
+                                     label = (userRole === 'admin' && !isPaid) ? "Billed" : "Done";
                                      nextStatus = "completed";
                                      icon = <CheckCircle size={28} strokeWidth={2.5} className="scale-75 xs:scale-100" />;
-                                     colorClass = "bg-emerald-600 border-emerald-500 text-white shadow-[0_10px_25px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95";
                                      enabled = isPaid; // Only allow completion if paid
+                                     colorClass = enabled 
+                                        ? "bg-emerald-600 border-emerald-500 text-white shadow-[0_10px_25px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95"
+                                        : "bg-gray-100 dark:bg-white/5 border-[var(--theme-border)] text-[var(--theme-text-muted)] opacity-40 cursor-not-allowed grayscale";
                                  }
                              }
 
@@ -310,15 +306,7 @@ const OrderDetailsModal = ({
                             <span className="text-[9px] font-bold text-orange-500 opacity-70 uppercase tracking-widest">{order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED').length} Total</span>
                         </div>
                         <div className="flex items-center gap-1.5 xs:gap-2">
-                            {!isCancelled && !isPaid && !isReady && !isPaymentOngoing && onCancelOrder && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onCancelOrder(order); }}
-                                    className="px-2.5 xs:px-4 py-1.5 xs:py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white text-[9px] xs:text-[10px] font-black rounded-lg xs:rounded-xl border border-red-500/20 shadow-sm flex items-center gap-1.5 uppercase transition-all active:scale-95"
-                                    title="Cancel Order"
-                                >
-                                    <X size={12} strokeWidth={3} /> <span className="hidden xs:inline">Cancel Order</span><span className="xs:hidden">Cancel</span>
-                                </button>
-                            )}
+                            {/* Cancel Order button hidden per request */}
                             {userRole === 'waiter' && !isCancelled && !isPaid && !isPaymentOngoing && (
                                 <button onClick={() => navigate('/dine-in', { state: { orderId: order._id } })} className="px-2.5 xs:px-4 py-1.5 xs:py-2 bg-orange-500 hover:bg-orange-600 text-white text-[9px] xs:text-[10px] font-black rounded-lg xs:rounded-xl shadow-lg shadow-orange-500/20 flex items-center gap-1.5 uppercase transition-all active:scale-95">
                                     <Plus size={12} strokeWidth={3} /> <span className="hidden xs:inline">Add Item</span><span className="xs:hidden">Add</span>
@@ -338,9 +326,7 @@ const OrderDetailsModal = ({
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-1.5 flex-wrap">
                                                 <p className="text-[13px] xs:text-[14px] font-black truncate text-[var(--theme-text-main)] leading-tight">{item.name}</p>
-                                                {item.isNewlyAdded && (
-                                                    <span className="bg-orange-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter animate-bounce shadow-sm">NEW</span>
-                                                )}
+                                                {/* item NEW badge hidden as per request */}
                                             </div>
                                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                 <span className="text-[9px] xs:text-[10px] font-bold text-[var(--theme-text-muted)] opacity-50 uppercase tracking-widest leading-none whitespace-nowrap">{formatPrice(item.price)}</span>

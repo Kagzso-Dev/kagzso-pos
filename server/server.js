@@ -209,9 +209,17 @@ app.get('/health', async (req, res) => {
 
     res.json({
         status: dbStatus === 'connected' ? 'healthy' : 'degraded',
+        timestamp: new Date().toISOString(),
         uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
-        database: { state: dbStatus, type: 'mysql' },
-        sockets: { connected: io.engine.clientsCount },
+        database: { 
+            state: dbStatus, 
+            type: 'mysql',
+            poolLimit: 10 
+        },
+        sockets: { 
+            connected: io.engine.clientsCount,
+            transport: 'live-websocket-polling'
+        },
         cache: getCacheStats()
     });
 });

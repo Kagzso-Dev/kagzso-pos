@@ -5,7 +5,7 @@ import api from '../../api';
 import {
     TrendingUp, TrendingDown, ShoppingBag, Clock, DollarSign, IndianRupee,
     Download, RefreshCw, ChevronDown, FileText,
-    Layers, Utensils, Package, LogOut
+    Layers, Utensils, Package, LogOut, Tag
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -111,8 +111,9 @@ const AdminDashboard = () => {
 
 
     const PER_PAGE = 10;
-    const { user, socket, formatPrice, settings } = useContext(AuthContext);
+    const { user, socket, formatPrice, settings, serverStatus, socketConnected } = useContext(AuthContext);
     const navigate = useNavigate();
+    const isLive = serverStatus === 'online' && socketConnected;
 
     /* ── Fetch Orders ─────────────────────────────────────────────────── */
     const fetchOrders = useCallback(async (forceRefresh = false) => {
@@ -249,6 +250,8 @@ const AdminDashboard = () => {
     const completedCount = dbStats?.today?.completed ?? 0;
     const allTimeCount  = dbStats?.allTime           ?? 0;
     const totalRevenue  = dbSummary?.totalRevenue    ?? 0;
+    const totalSgst     = dbSummary?.totalSgst       ?? 0;
+    const totalCgst     = dbSummary?.totalCgst       ?? 0;
     const avgOrderValue = dbSummary?.avgOrderValue   ?? 0;
     const orderCount    = dbSummary?.orderCount      ?? 0;
 
@@ -312,18 +315,27 @@ const AdminDashboard = () => {
         <div className="space-y-5 animate-fade-in">
 
             {/* ── Page Header ─────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 bg-[var(--theme-bg-card2)] rounded-3xl p-5 sm:p-6 border border-[var(--theme-border)] shadow-xl">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-[var(--theme-text-main)] uppercase tracking-tighter leading-tight flex items-center">
-                        KAGZSO
-                        <span className="text-white font-black ml-2 text-xs sm:text-base uppercase tracking-widest px-2 py-0.5 bg-[var(--theme-bg-dark)] rounded-lg border border-[var(--theme-border)] shadow-inner">
-                            Analytics
-                        </span>
-                    </h1>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-3xl sm:text-4xl font-[900] text-[var(--theme-text-main)] tracking-tight">
+                            Dashboard <span className="text-orange-500">Summary</span>
+                        </h1>
+                        <div className={`
+                            flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest
+                            ${isLive 
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'}
+                        `}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                            {isLive ? 'Live Connection' : 'Disconnected'}
+                        </div>
+                    </div>
+                    <p className="text-[var(--theme-text-subtle)] text-sm font-medium opacity-70">
+                        Welcome back, Admin. Here's your restaurant's performance Overview.
+                    </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    {/* Mobile: Logout | Desktop/Tablet: Refresh */}
-
                     <button
                         onClick={exportExcel}
                         className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/30 min-h-[44px] whitespace-nowrap"
@@ -364,9 +376,9 @@ const AdminDashboard = () => {
 
             {/* ── Stats Grid — values sourced from MySQL via API ─────── */}
             {/* Mobile: 1-col → xs: 2-col → md: 2-col (iPad Mini) → xl: 4-col */}
-            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
                 {statsLoading ? (
-                    Array(4).fill(0).map((_, i) => <SkeletonCard key={i} />)
+                    Array(6).fill(0).map((_, i) => <SkeletonCard key={i} />)
                 ) : (
                     <>
                         {/* Total Revenue — MySQL: SUM(final_amount) WHERE payment_status='paid' */}
@@ -385,13 +397,32 @@ const AdminDashboard = () => {
                                 </div>
                             }
                         />
+
+                        {/* Total SGST — MySQL: SUM(sgst) WHERE payment_status='paid' */}
+                        <StatCard
+                            title="Total SGST (30d)"
+                            value={formatPrice(totalSgst)}
+                            subtitle="Sate GST Collected"
+                            icon={Tag}
+                            color="blue"
+                        />
+
+                        {/* Total CGST — MySQL: SUM(cgst) WHERE payment_status='paid' */}
+                        <StatCard
+                            title="Total CGST (30d)"
+                            value={formatPrice(totalCgst)}
+                            subtitle="Central GST Collected"
+                            icon={Tag}
+                            color="emerald"
+                        />
+
                         {/* Active — MySQL: COUNT(*) WHERE order_status IN ('pending','accepted','preparing','ready') */}
                         <StatCard
                             title="Active Orders"
                             value={activeCount}
                             subtitle={null}
                             icon={ShoppingBag}
-                            color="blue"
+                            color="orange"
                             badge={
                                 <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
                                     Live

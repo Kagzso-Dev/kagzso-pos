@@ -2,6 +2,7 @@ const Order        = require('../models/Order');
 const Table        = require('../models/Table');
 const Payment      = require('../models/Payment');
 const PaymentAudit = require('../models/PaymentAudit');
+const Setting      = require('../models/Setting');
 const { createAndEmitNotification } = require('./notificationController');
 const { invalidateCache }           = require('../utils/cache');
 const { updateDailyAnalytics }      = require('../utils/analytics');
@@ -94,7 +95,6 @@ const createOrder = async (req, res) => {
 
     try {
         // Check settings from DB to allow/disable order types
-        const Setting = require('../models/Setting');
         const settings = await Setting.get();
         
         if (orderType === 'dine-in' && settings.dineInEnabled === 0) {
@@ -117,9 +117,24 @@ const createOrder = async (req, res) => {
             }
         }
 
+        // Force recalculation based on admin settings (on discounted subtotal)
+        const sRate = (settings.sgst || 0) / 100;
+        const cRate = (settings.cgst || 0) / 100;
+        const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.price) * parseInt(i.quantity)), 0);
+        const discValue = parseFloat(discount) || 0;
+        const discountedSubtotal = Math.max(0, subtotal - discValue);
+        
+        const resolvedSgst = parseFloat((discountedSubtotal * sRate).toFixed(2));
+        const resolvedCgst = parseFloat((discountedSubtotal * cRate).toFixed(2));
+        const resolvedFinal = parseFloat((discountedSubtotal + resolvedSgst + resolvedCgst).toFixed(2));
+
         const createdOrder = await Order.create({
             orderType, tableId, customerInfo, items,
-            totalAmount, sgst, cgst, discount, finalAmount,
+            totalAmount: subtotal, 
+            sgst: resolvedSgst, 
+            cgst: resolvedCgst, 
+            discount: discValue, 
+            finalAmount: resolvedFinal,
             waiterId: req.userId,
         });
 
@@ -565,11 +580,18 @@ const cancelOrderItem = async (req, res) => {
             newOrderStatus = 'ready';
         }
 
-        // Recalculate order totals (2.5% SGST, 2.5% CGST)
+        // Recalculate order totals from settings (on discounted subtotal)
+        const settings = await Setting.get();
+        const sgstRate = (settings.sgst || 0) / 100;
+        const cgstRate = (settings.cgst || 0) / 100;
+
         const subtotalSum = nonCancelledItems.reduce((sum, i) => sum + (parseFloat(i.price) * parseInt(i.quantity)), 0);
-        const newSgst = parseFloat((subtotalSum * 0.025).toFixed(2));
-        const newCgst = parseFloat((subtotalSum * 0.025).toFixed(2));
-        const newFinal = parseFloat((subtotalSum + newSgst + newCgst - (parseFloat(order.discount) || 0)).toFixed(2));
+        const discValue = parseFloat(order.discount) || 0;
+        const discountedSubtotal = Math.max(0, subtotalSum - discValue);
+
+        const newSgst = parseFloat((discountedSubtotal * sgstRate).toFixed(2));
+        const newCgst = parseFloat((discountedSubtotal * cgstRate).toFixed(2));
+        const newFinal = parseFloat((discountedSubtotal + newSgst + newCgst).toFixed(2));
 
         const orderUpdates = {
             totalAmount: subtotalSum,

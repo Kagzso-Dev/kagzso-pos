@@ -240,7 +240,7 @@ const AdminOrders = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [cancelModal, setCancelModal] = useState({ isOpen: false, order: null });
     const datePickerRef = useRef(null);
-    const { user, formatPrice, socket } = useContext(AuthContext);
+    const { user, formatPrice, socket, settings } = useContext(AuthContext);
     const location = useLocation();
 
     // ── External URL auto-sync (Open order from Search) ──────────────────────
@@ -581,6 +581,7 @@ const AdminOrders = () => {
             onProcessPayment={handleProcessPayment}
             onCancelOrder={(o) => setCancelModal({ isOpen: true, order: o })}
             userRole={user?.role}
+            settings={settings}
         />
 
         <CancelOrderModal
