@@ -323,6 +323,14 @@ const AdminOrders = () => {
             });
         }
 
+        // Global setting filter: Hide takeaway/dine-in from history if disabled
+        if (settings?.takeawayEnabled === false || settings?.takeawayEnabled === 0) {
+            temp = temp.filter(o => o.orderType !== 'takeaway');
+        }
+        if (settings?.dineInEnabled === false || settings?.dineInEnabled === 0) {
+            temp = temp.filter(o => o.orderType !== 'dine-in');
+        }
+
         setFilteredOrders(temp);
     }, [orders, dateRange, fromDate, toDate, searchQuery]);
 

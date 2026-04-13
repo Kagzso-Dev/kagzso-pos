@@ -262,7 +262,7 @@ const Settings = () => {
             await api.put('/api/settings', generalConfig, { headers: { Authorization: `Bearer ${user.token}` } });
             await saveSetting('generalConfig', generalConfig);
             if (fetchSettings) await fetchSettings();
-            setMsg(key, 'success', 'Saved successfully');
+            setMsg(key, 'success', 'Saved');
         } catch (err) {
             setMsg(key, 'error', err.response?.data?.message || 'Save failed');
         }
@@ -334,12 +334,13 @@ const Settings = () => {
                             {generalConfig.tableMapEnabled ? <ToggleRight size={24} className="text-green-500" /> : <ToggleLeft size={24} className="text-gray-400" />}
                         </button>
                     </div>
-                    <div className="pt-3 border-t border-[var(--theme-border)]">
+                    <div className="pt-3 border-t border-[var(--theme-border)] flex items-center gap-3">
                         <button type="button" onClick={e => saveConfig(e, 'features')} disabled={loading}
                             className="h-10 px-6 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-orange-600/20 disabled:opacity-50 flex items-center gap-2">
                             {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                             Save Features
                         </button>
+                        <Notice msg={msgs['features']} />
                     </div>
                 </div>
             </Card>

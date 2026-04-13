@@ -314,8 +314,13 @@ const CashierDashboard = () => {
     }, [user, isHistoryMode]);
     const filteredOrders = useMemo(() => {
         if (!Array.isArray(orders)) return [];
-        return orders.filter(o => filterType === 'all' || o.orderType === filterType);
-    }, [orders, filterType]);
+        return orders
+            .filter(o => 
+                (settings?.takeawayEnabled !== false || o.orderType !== 'takeaway') &&
+                (settings?.dineInEnabled !== false || o.orderType !== 'dine-in')
+            )
+            .filter(o => filterType === 'all' || o.orderType === filterType);
+    }, [orders, filterType, settings?.takeawayEnabled, settings?.dineInEnabled]);
 
     // ── Pre-calculate counts for filters ───
     const counts = useMemo(() => {

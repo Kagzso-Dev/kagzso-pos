@@ -257,9 +257,14 @@ const AdminDashboard = () => {
 
     /* ── Filtered & Paginated Orders ─────────────────────────────────── */
     const filteredOrders = useMemo(() => {
-        if (filterType === 'all') return orders;
-        return orders.filter(o => o.orderType?.toLowerCase() === filterType.toLowerCase());
-    }, [orders, filterType]);
+        // Global setting filter: respect dine-in and takeaway settings
+        const base = orders.filter(o => 
+            (settings?.takeawayEnabled !== false || o.orderType !== 'takeaway') &&
+            (settings?.dineInEnabled !== false || o.orderType !== 'dine-in')
+        );
+        if (filterType === 'all') return base;
+        return base.filter(o => o.orderType?.toLowerCase() === filterType.toLowerCase());
+    }, [orders, filterType, settings?.takeawayEnabled, settings?.dineInEnabled]);
 
     const paginated = useMemo(() => {
         const start = (page - 1) * PER_PAGE;
@@ -462,7 +467,12 @@ const AdminDashboard = () => {
                             { id: 'all',      icon: <Layers size={13} />,   label: 'All' },
                             { id: 'dine-in',  icon: <Utensils size={13} />, label: 'Dine In' },
                             { id: 'takeaway', icon: <Package size={13} />,  label: 'Takeaway' }
-                        ].map((btn) => (
+                        ]
+                        .filter(btn => 
+                            (btn.id !== 'takeaway' || settings?.takeawayEnabled !== false) &&
+                            (btn.id !== 'dine-in' || settings?.dineInEnabled !== false)
+                        )
+                        .map((btn) => (
                             <button
                                 key={btn.id}
                                 onClick={() => setFilterType(btn.id)}
