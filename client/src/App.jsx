@@ -42,7 +42,9 @@ const LiveGuard = ({ children }) => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Only divert if logged in and not already on connection/login pages
+        // Redirection logic to /connection page disabled per user request to hide connection UI.
+        // The application will now remain on the target page regardless of socket connectivity status.
+        /*
         if (user && !socketConnected && 
             !['/connection', '/login', '/unauthorized'].includes(location.pathname)) {
             const timer = setTimeout(() => {
@@ -50,6 +52,7 @@ const LiveGuard = ({ children }) => {
             }, 5000);
             return () => clearTimeout(timer);
         }
+        */
     }, [socketConnected, user, location.pathname, navigate]);
 
     return children;

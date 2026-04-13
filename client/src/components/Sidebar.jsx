@@ -137,12 +137,14 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                             <span className="text-sm font-black text-orange-500 uppercase leading-tight">KAGZSO</span>
                             <h1 className="text-xs font-black tracking-tight text-[var(--theme-text-main)] truncate leading-tight uppercase flex items-center gap-2">
                                 {settings?.restaurantName || 'admin'}
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--theme-border)]">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${socketConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'} `} />
-                                    <span className={`text-[8px] font-black tracking-widest ${socketConnected ? 'text-emerald-500' : 'text-red-500'}`}>
-                                        {socketConnected ? 'LIVE' : 'OFFLINE'}
-                                    </span>
-                                </div>
+                                {socketConnected && (
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                        <span className="text-[8px] font-black tracking-widest text-emerald-500 uppercase">
+                                            LIVE
+                                        </span>
+                                    </div>
+                                )}
                             </h1>
                         </div>
                     )}
