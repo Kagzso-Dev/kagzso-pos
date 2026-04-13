@@ -309,18 +309,12 @@ const DineIn = () => {
                         style={{ overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' }}
                     >
                         <TableGrid
-                            allowedStatuses={['available', 'occupied', 'reserved']}
+                            allowedStatuses={['available']}
                             filterByAllowedStatuses={false}
-                            showCleanAction={true}
+                            showCleanAction={false}
                             onSelectTable={(table) => {
-                                if (table.status === 'occupied' && table.currentOrderId) {
-                                    setExistingOrderId(table.currentOrderId);
-                                    setIsAddingItems(true);
-                                    setStep(3);
-                                } else {
-                                    setSelectedTable(table);
-                                    setStep(3);
-                                }
+                                setSelectedTable(table);
+                                setStep(3);
                             }}
                         />
                     </div>

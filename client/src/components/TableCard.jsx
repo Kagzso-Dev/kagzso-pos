@@ -64,7 +64,7 @@ const TableCard = ({ table, onClick, clickable = false, actions, variant = 'grid
                 onClick={clickable ? onClick : undefined}
                 onKeyDown={clickable ? (e) => e.key === 'Enter' && onClick?.() : undefined}
                 className={`relative flex items-center justify-between gap-4 px-4 py-3 rounded-xl border ${cfg.border} ${cfg.bg} transition-all duration-150 group
-                    ${clickable ? `cursor-pointer hover:shadow-md ${cfg.hoverBg}` : 'cursor-default'}`}
+                    ${clickable ? `cursor-pointer hover:shadow-md ${cfg.hoverBg}` : 'cursor-not-allowed opacity-60'}`}
             >
                 <div className="flex items-center gap-3">
                     <span className={`w-2 h-2 rounded-full ${cfg.dot} ${table.status === 'reserved' ? 'animate-pulse' : ''}`} />
@@ -94,7 +94,7 @@ const TableCard = ({ table, onClick, clickable = false, actions, variant = 'grid
                 relative flex flex-col items-center justify-center
                 w-full py-4 px-1 sm:max-w-[130px] rounded-[1.75rem] border-2 ${cfg.border} ${cfg.bg}
                 shadow-sm transition-all duration-300 group select-none
-                ${clickable ? `cursor-pointer hover:shadow-xl hover:-translate-y-1 active:scale-95 ${cfg.hoverBg}` : 'cursor-default'}
+                ${clickable ? `cursor-pointer hover:shadow-xl hover:-translate-y-1 active:scale-95 ${cfg.hoverBg}` : 'cursor-not-allowed opacity-60'}
             `}
         >
             {/* Table Label */}
