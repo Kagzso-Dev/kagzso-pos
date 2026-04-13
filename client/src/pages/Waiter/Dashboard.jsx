@@ -711,7 +711,7 @@ const WaiterDashboard = () => {
                         </div>
                         <div className="overflow-y-auto p-4 sm:p-5 flex-1">
                             <TableGrid
-                                allowedStatuses={['available', 'occupied', 'reserved']}
+                                allowedStatuses={['available', 'occupied', 'cleaning']}
                                 filterByAllowedStatuses={false}
                                 showCleanAction={true}
                                 onReserve={handleReserveTable}

@@ -217,7 +217,7 @@ const Analytics = () => {
                             </button>
                         ))}
                     </div>
-                    <NotificationBell />
+                    {/* <NotificationBell /> */}
 
                     <button
                         onClick={exportExcel}

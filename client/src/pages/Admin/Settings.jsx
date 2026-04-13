@@ -303,7 +303,7 @@ const Settings = () => {
                 <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">Manage restaurant configuration</p>
             </div>
 
-            {/* Feature Toggles */}
+            {/* Feature Toggles - Hidden as requested
             <Card>
                 <SectionHeader icon={Shield} title="Order Types" color="orange" />
                 <div className="p-5 space-y-4">
@@ -344,6 +344,7 @@ const Settings = () => {
                     </div>
                 </div>
             </Card>
+            */}
 
             {/* Business Info */}
             <Card>
