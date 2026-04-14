@@ -62,7 +62,7 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
                                 order.orderStatus === 'payment' ? 'border-l-red-500' :
                                     'border-l-[var(--theme-text-muted)]';
 
-    const visibleItems = order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED') || [];
+    const visibleItems = order.items || [];
 
     return (
         <div className={`
@@ -96,14 +96,19 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
 
             {/* ── Items ── */}
             <div className="flex-1 px-2 py-2 space-y-1 min-h-[60px] max-h-[120px] overflow-y-auto custom-scrollbar">
-                {visibleItems.map((item, i) => (
-                    <div key={i} className="flex items-start gap-1.5">
-                        <div className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center text-[9px] font-black bg-white/5 text-[var(--theme-text-muted)]">
-                            {item.quantity}
+                {visibleItems.map((item, i) => {
+                    const isCancelled = item.status?.toUpperCase() === 'CANCELLED';
+                    return (
+                        <div key={i} className="flex items-start gap-1.5">
+                            <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center text-[9px] font-black ${isCancelled ? 'bg-red-500/10 text-red-500' : 'bg-white/5 text-[var(--theme-text-muted)]'}`}>
+                                {item.quantity}
+                            </div>
+                            <span className={`flex-1 text-[11px] font-bold leading-tight line-clamp-2 ${isCancelled ? 'text-red-500 line-through' : 'text-[var(--theme-text-main)]'}`}>
+                                {item.name}{item.variant ? ` (${item.variant.name})` : ''}
+                            </span>
                         </div>
-                        <span className="flex-1 text-[11px] font-bold text-[var(--theme-text-main)] leading-tight line-clamp-2">{item.name}{item.variant ? ` (${item.variant.name})` : ''}</span>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* ── Footer ── */}

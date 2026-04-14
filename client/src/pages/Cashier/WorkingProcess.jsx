@@ -35,8 +35,29 @@ const WorkingProcess = () => {
 
         if (!socket) return;
 
+        const playNotificationSound = () => {
+            try {
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                audio.volume = 0.5;
+                audio.loop = true;
+                audio.play().catch(e => console.log('Audio play blocked. Interact with the page to enable sounds.', e));
+
+                // Stop after 5 seconds
+                setTimeout(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }, 5000);
+            } catch (err) {
+                console.error('Error playing sound:', err);
+            }
+        };
+
         const onNewOrder = (newOrder) => {
-            setOrders(prev => prev.find(o => o._id === newOrder._id) ? prev : [newOrder, ...prev]);
+            setOrders(prev => {
+                if (prev.find(o => o._id === newOrder._id)) return prev;
+                playNotificationSound();
+                return [newOrder, ...prev];
+            });
         };
 
         const onOrderUpdated = (updatedOrder) => {

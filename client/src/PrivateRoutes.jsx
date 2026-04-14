@@ -52,7 +52,7 @@ const AdminRoute = () => (
 );
 
 const KitchenRoute = () => (
-    <RoleRoute allowedRoles={['kitchen', 'admin']} />
+    <RoleRoute allowedRoles={['kitchen', 'admin', 'waiter', 'cashier']} />
 );
 
 const CashierRoute = () => (

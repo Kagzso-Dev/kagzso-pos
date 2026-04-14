@@ -161,26 +161,38 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
 
             {/* ── Items ─────────────────────────────────────────────────── */}
             <div className="flex-1 px-3 py-2.5 space-y-2 overflow-y-auto custom-scrollbar min-h-[60px] max-h-[220px]">
-                {/* ACTIVE ITEMS */}
-                {order.items.filter(i => i.status?.toUpperCase() !== 'READY' && i.status?.toUpperCase() !== 'CANCELLED').map(item => (
-                    <div key={item._id} className="flex items-start gap-1.5 group">
-                        <div className="w-4 h-4 shrink-0 rounded flex items-center justify-center text-[10px] font-black bg-[var(--theme-bg-hover)] text-[var(--theme-text-muted)] border border-[var(--theme-border)] mt-0.5">
-                            {item.quantity}
+                {/* ITEMS LIST (Active & Cancelled) */}
+                {order.items.filter(i => i.status?.toUpperCase() !== 'READY').map(item => {
+                    const isCancelled = item.status?.toUpperCase() === 'CANCELLED';
+                    return (
+                        <div key={item._id} className="flex flex-col gap-0.5">
+                            <div className="flex items-start gap-1.5 group">
+                                <div className={`w-4 h-4 shrink-0 rounded flex items-center justify-center text-[10px] font-black ${isCancelled ? 'bg-red-500/10 text-red-600' : 'bg-[var(--theme-bg-hover)] text-[var(--theme-text-muted)]'} border border-[var(--theme-border)] mt-0.5`}>
+                                    {item.quantity}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className={`text-[11px] sm:text-[12px] font-bold leading-tight tracking-tight ${isCancelled ? 'text-red-500 line-through' : 'text-[var(--theme-text-main)]'}`}>
+                                        {item.name}
+                                        {item.variant?.name && <span className="ml-1 text-[8px] opacity-60">({item.variant.name})</span>}
+                                    </p>
+                                </div>
+                                {!isCancelled && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onCancelItem(order, item); }}
+                                        className="w-5 h-5 flex items-center justify-center rounded bg-red-500/5 hover:bg-red-500/15 text-red-500/40 hover:text-red-500 transition-all border border-red-500/10"
+                                    >
+                                        <XCircle size={12} />
+                                    </button>
+                                )}
+                            </div>
+                            {isCancelled && item.cancelReason && (
+                                <p className="text-[9px] text-red-500/70 italic pl-5 break-words">
+                                    {item.cancelReason}
+                                </p>
+                            )}
                         </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-[11px] sm:text-[12px] font-bold text-[var(--theme-text-main)] leading-tight tracking-tight">
-                                {item.name}
-                                {item.variant?.name && <span className="ml-1 text-[8px] opacity-60">({item.variant.name})</span>}
-                            </p>
-                        </div>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onCancelItem(order, item); }}
-                            className="w-5 h-5 flex items-center justify-center rounded bg-red-500/5 hover:bg-red-500/15 text-red-500/40 hover:text-red-500 transition-all border border-red-500/10"
-                        >
-                            <XCircle size={12} />
-                        </button>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {/* COMPLETED ITEMS (Streamlined) */}
                 {order.items.some(i => i.status?.toUpperCase() === 'READY') && (
@@ -417,9 +429,27 @@ const KitchenDashboard = () => {
         fetchOrders();
 
         if (socket) {
+            const playNotificationSound = () => {
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.volume = 0.5;
+                    audio.loop = true;
+                    audio.play().catch(e => console.log('Audio play blocked. Click anywhere to enable sounds.', e));
+                    
+                    // Stop the sound after 5 seconds
+                    setTimeout(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                    }, 5000);
+                } catch (err) {
+                    console.error('Error playing sound:', err);
+                }
+            };
+
             const onNewOrder = (order) => {
                 setOrders(prev => {
                     if (prev.find(o => o._id === order._id)) return prev;
+                    playNotificationSound();
                     return [order, ...prev];
                 });
             };

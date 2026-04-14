@@ -349,8 +349,29 @@ const CashierDashboard = () => {
 
         if (socket) {
             // Real-time updates: no polling needed
+            const playNotificationSound = () => {
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.volume = 0.5;
+                    audio.loop = true;
+                    audio.play().catch(e => console.log('Audio play blocked. Click anywhere to enable sounds.', e));
+
+                    // Stop after 5 seconds
+                    setTimeout(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                    }, 5000);
+                } catch (err) {
+                    console.error('Error playing sound:', err);
+                }
+            };
+
             const onNewOrder = (order) => {
                 const alreadyExists = prev => prev.find(o => o._id === order._id);
+                
+                // Play sound for all incoming orders
+                playNotificationSound();
+
                 if (isHistoryMode) {
                     if ((order.paymentStatus === 'paid' || order.orderStatus === 'cancelled')) {
                          setOrders(prev => alreadyExists(prev) ? prev : [order, ...prev]);

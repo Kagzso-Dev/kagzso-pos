@@ -315,51 +315,59 @@ const OrderDetailsModal = ({
                         </div>
                     </div>
                     <div className="space-y-2 xs:space-y-2.5">
-                        {order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED').map((item, i) => {
+                        {order.items?.map((item, i) => {
                             const cancelled = item.status?.toUpperCase() === 'CANCELLED';
                             return (
-                                <div key={item._id || i} className={`group flex items-center justify-between p-2.5 xs:p-3.5 rounded-xl xs:rounded-2xl border transition-all ${cancelled ? 'opacity-40 bg-[var(--theme-bg-dark)] border-dashed border-[var(--theme-border)]' : 'bg-white dark:bg-[var(--theme-bg-hover)] border-[var(--theme-border)] shadow-sm hover:shadow-md'}`}>
-                                    <div className="flex items-center gap-2.5 xs:gap-3.5 flex-1 min-w-0">
-                                        <div className="w-8 h-8 xs:w-10 xs:h-10 rounded-lg xs:rounded-xl flex items-center justify-center bg-gray-50 dark:bg-white/5 border border-[var(--theme-border)] shrink-0 shadow-inner">
-                                            <span className="text-[11px] xs:text-xs font-black">{item.quantity}</span>
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <p className="text-[13px] xs:text-[14px] font-black truncate text-[var(--theme-text-main)] leading-tight">{item.name}</p>
-                                                {/* item NEW badge hidden as per request */}
+                                <div key={item._id || i} className={`group flex flex-col p-2.5 xs:p-3.5 rounded-xl xs:rounded-2xl border transition-all ${cancelled ? 'opacity-50 bg-[var(--theme-bg-dark)] border-dashed border-red-500/20' : 'bg-white dark:bg-[var(--theme-bg-hover)] border-[var(--theme-border)] shadow-sm hover:shadow-md'}`}>
+                                    <div className="flex items-center justify-between w-full">
+                                        <div className="flex items-center gap-2.5 xs:gap-3.5 flex-1 min-w-0">
+                                            <div className="w-8 h-8 xs:w-10 xs:h-10 rounded-lg xs:rounded-xl flex items-center justify-center bg-gray-50 dark:bg-white/5 border border-[var(--theme-border)] shrink-0 shadow-inner">
+                                                <span className="text-[11px] xs:text-xs font-black">{item.quantity}</span>
                                             </div>
-                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                <span className="text-[9px] xs:text-[10px] font-bold text-[var(--theme-text-muted)] opacity-50 uppercase tracking-widest leading-none whitespace-nowrap">{formatPrice(item.price)}</span>
-                                                {item.status && (
-                                                    <span className={`text-[7px] xs:text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border whitespace-nowrap leading-none ${
-                                                        item.status?.toUpperCase() === 'READY' ? 'border-emerald-500/30 text-emerald-500 bg-emerald-500/5' : 
-                                                        item.status?.toUpperCase() === 'CANCELLED' ? 'border-red-500/30 text-red-500 bg-red-500/5' : 
-                                                        'border-orange-500/30 text-orange-500 bg-orange-500/5'
-                                                    }`}>
-                                                        {item.status}
-                                                    </span>
-                                                )}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <p className={`text-[13px] xs:text-[14px] font-black truncate text-[var(--theme-text-main)] leading-tight ${cancelled ? 'line-through' : ''}`}>{item.name}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                    <span className="text-[9px] xs:text-[10px] font-bold text-[var(--theme-text-muted)] opacity-50 uppercase tracking-widest leading-none whitespace-nowrap">{formatPrice(item.price)}</span>
+                                                    {item.status && (
+                                                        <span className={`text-[7px] xs:text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border whitespace-nowrap leading-none ${
+                                                            item.status?.toUpperCase() === 'READY' ? 'border-emerald-500/30 text-emerald-500 bg-emerald-500/5' : 
+                                                            item.status?.toUpperCase() === 'CANCELLED' ? 'border-red-500/30 text-red-500 bg-red-500/5' : 
+                                                            'border-orange-500/30 text-orange-500 bg-orange-500/5'
+                                                        }`}>
+                                                            {item.status}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 xs:gap-4 ml-2">
-                                        <p className="text-[13px] xs:text-[15px] font-black tabular-nums text-[var(--theme-text-main)] tracking-tight">{formatPrice(item.price * item.quantity)}</p>
+                                        <div className="flex items-center gap-2 xs:gap-4 ml-2">
+                                            <p className={`text-[13px] xs:text-[15px] font-black tabular-nums text-[var(--theme-text-main)] tracking-tight ${cancelled ? 'line-through opacity-50' : ''}`}>{formatPrice(item.price * item.quantity)}</p>
 
-                                        {(userRole === 'waiter' || userRole === 'admin') && onCancelItem && !cancelled && !isPaymentOngoing && (
-                                            <button 
-                                                disabled={item.status?.toUpperCase() !== 'PENDING'}
-                                                onClick={() => onCancelItem(order, item)} 
-                                                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all 
-                                                    ${item.status?.toUpperCase() === 'PENDING' 
-                                                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white active:scale-90 shadow-sm border border-red-500/20' 
-                                                        : 'bg-gray-100 dark:bg-white/5 text-gray-300 dark:text-gray-700 cursor-not-allowed grayscale'
-                                                    }`}
-                                                title={item.status?.toUpperCase() === 'PENDING' ? 'Cancel Item' : 'Already in Progress'}
-                                            >
-                                                <X size={14} strokeWidth={3} />
-                                            </button>
-                                        )}
+                                            {(userRole === 'waiter' || userRole === 'admin') && onCancelItem && !cancelled && !isPaymentOngoing && (
+                                                <button 
+                                                    disabled={item.status?.toUpperCase() !== 'PENDING'}
+                                                    onClick={() => onCancelItem(order, item)} 
+                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all 
+                                                        ${item.status?.toUpperCase() === 'PENDING' 
+                                                            ? 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white active:scale-90 shadow-sm border border-red-500/20' 
+                                                            : 'bg-gray-100 dark:bg-white/5 text-gray-300 dark:text-gray-700 cursor-not-allowed grayscale'
+                                                        }`}
+                                                    title={item.status?.toUpperCase() === 'PENDING' ? 'Cancel Item' : 'Already in Progress'}
+                                                >
+                                                    <X size={14} strokeWidth={3} />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
+                                    {cancelled && item.cancelReason && (
+                                        <div className="mt-1.5 pl-10 xs:pl-14">
+                                            <p className="text-[9px] text-red-500/70 italic font-medium break-words">
+                                                Reason: {item.cancelReason}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

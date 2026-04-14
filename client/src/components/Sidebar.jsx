@@ -198,6 +198,10 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                         <NavItem to="/admin/notifications" icon={Bell} label="Notifications" color="text-orange-400" badge={unreadCount > 0 ? unreadCount : null} />
                         <NavItem to="/admin/menu" icon={Coffee} label="Menu Items" />
                         <NavItem to="/admin/categories" icon={Layers} label="Categories" />
+                        <SectionLabel>Live Views</SectionLabel>
+                        <NavItem to="/kitchen" icon={ChefHat} label="Kitchen View" color="text-orange-400" />
+                        <NavItem to="/cashier" icon={Monitor} label="Cashier Point" color="text-green-400" />
+                        <NavItem to="/waiter" icon={Armchair} label="Waiter Board" color="text-yellow-400" />
                     </>
                 )}
 
@@ -208,7 +212,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
 
                         {user.role === 'kitchen' && (
                             <>
-                                <NavItem to="/kitchen?tab=active" icon={ChefHat} label="Active" color="text-orange-400" />
+                                <NavItem to="/kitchen?tab=active" icon={ChefHat} label="Active KOTs" color="text-orange-400" />
                             </>
                         )}
 
@@ -216,14 +220,14 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                             <>
                                 <NavItem to="/cashier" icon={Monitor} label="Cashier Point" color="text-green-400" />
                                 <NavItem to="/waiter" icon={Armchair} label="Order View" color="text-yellow-400" />
-                                <NavItem to="/cashier/kitchen-view" icon={ChefHat} label="Kitchen View" color="text-orange-400" />
+                                <NavItem to="/kitchen" icon={ChefHat} label="Kitchen View" color="text-orange-400" />
                             </>
                         )}
 
                         {user.role === 'waiter' && (
                             <>
                                 <NavItem to="/waiter" icon={LayoutDashboard} label="Waiter Dashboard" color="text-pink-400" />
-                                <NavItem to="/waiter/kitchen-view" icon={ChefHat} label="Kitchen View" color="text-emerald-400" />
+                                <NavItem to="/kitchen" icon={ChefHat} label="Kitchen View" color="text-emerald-400" />
                                 <NavItem to="/waiter/history" icon={History} label="Order History" color="text-purple-400" />
                             </>
                         )}
