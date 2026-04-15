@@ -13,7 +13,7 @@ import { printBill } from '../../components/BillPrint';
 import {
     Printer, Banknote, CheckCircle,
     ShoppingBag, RefreshCw, ArrowLeft,
-    Clock, AlertTriangle, Grid, List, LogOut
+    Clock, AlertTriangle, Grid, List, LogOut, ChefHat
 } from 'lucide-react';
 
 /* ── Order List Item ──────────────────────────────────────────────────────── */
@@ -366,7 +366,7 @@ const CashierDashboard = () => {
                 }
             };
 
-            const announcePaymentReady = (order) => {
+            const announcePaymentReady = (order, callback) => {
                 const isDineIn = order.orderType === 'dine-in';
                 const idLabel = isDineIn 
                     ? `table number ${order.tableId?.number || order.tableId || '?'}`
@@ -375,18 +375,18 @@ const CashierDashboard = () => {
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.rate = 0.9;
                 utterance.pitch = 1;
+                if (callback) {
+                    utterance.onend = callback;
+                }
                 window.speechSynthesis.speak(utterance);
             };
 
             const onNewOrder = (order) => {
                 const alreadyExists = prev => prev.find(o => o._id === order._id);
                 
-                // Play bell for all incoming orders (5s loop)
-                playNotificationSound();
-                
-                // Also announce if it's already in payment status
+                // Voice first, then bell
                 if (order.orderStatus === 'payment') {
-                    announcePaymentReady(order);
+                    announcePaymentReady(order, playNotificationSound);
                 }
 
                 if (isHistoryMode) {
@@ -405,8 +405,7 @@ const CashierDashboard = () => {
                     const becomesPayment = order.orderStatus === 'payment' && !exists;
                     
                     if (becomesPayment) {
-                        playNotificationSound();
-                        announcePaymentReady(order);
+                        announcePaymentReady(order, playNotificationSound);
                     }
 
                     if (isHistoryMode) {
@@ -545,6 +544,14 @@ const CashierDashboard = () => {
                         <div className="bg-orange-500/10 border border-orange-500/20 text-orange-500 px-2 xs:px-2.5 h-8 xs:h-9 flex items-center justify-center rounded-lg xs:rounded-xl text-[9px] xs:text-[10px] font-black transition-all">
                             {(orders || []).filter(o => filterType === 'all' || o.orderType === filterType).length}
                         </div>
+                        {/* Kitchen View Shortcut */}
+                        <button
+                            onClick={() => navigate('/kitchen')}
+                            title="Kitchen View"
+                            className="w-8 h-8 xs:w-9 xs:h-9 flex items-center justify-center rounded-lg xs:rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-500 transition-all hover:bg-orange-500 hover:text-white active:scale-95 shadow-sm"
+                        >
+                            <ChefHat size={14} xs:size={16} strokeWidth={2.5} />
+                        </button>
 
                          <button
                             onClick={() => { const next = !isCardView; setIsCardView(next); localStorage.setItem('cashierCardView', next); }}

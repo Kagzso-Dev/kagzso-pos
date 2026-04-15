@@ -353,6 +353,23 @@ const WaiterDashboard = () => {
     useEffect(() => {
         if (user) fetchOrders();
         if (socket) {
+            const playNotificationSound = () => {
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.volume = 0.5;
+                    audio.loop = true;
+                    audio.play().catch(e => console.log('Audio play blocked. Interact with the page to enable sounds.', e));
+
+                    // Stop after 5 seconds
+                    setTimeout(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                    }, 5000);
+                } catch (err) {
+                    console.error('Error playing sound:', err);
+                }
+            };
+
             const announceOrderReady = (order) => {
                 if (order.orderStatus === 'ready' && order.orderType === 'dine-in') {
                     const tableNumber = order.tableId?.number || order.tableId || '?';
@@ -366,7 +383,10 @@ const WaiterDashboard = () => {
 
             const onNew = (o) => setOrders(p => { 
                 if (p.find(x => x._id === o._id)) return p; 
-                if (o.orderStatus === 'ready') announceOrderReady(o);
+                if (o.orderStatus === 'ready') {
+                    playNotificationSound();
+                    announceOrderReady(o);
+                }
                 return [o, ...p]; 
             });
 
@@ -375,6 +395,7 @@ const WaiterDashboard = () => {
                     const existing = p.find(x => x._id === o._id); 
                     // Voice announcement if order becomes READY
                     if (o.orderStatus === 'ready' && (!existing || existing.orderStatus !== 'ready')) {
+                        playNotificationSound();
                         announceOrderReady(o);
                     }
                     return existing ? p.map(x => x._id === o._id ? o : x) : [o, ...p]; 

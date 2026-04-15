@@ -57,8 +57,8 @@ const WorkingProcess = () => {
                 const alreadyExists = prev.find(o => o._id === newOrder._id);
                 if (alreadyExists) return prev;
                 
-                // Only sound bell for new preparation tasks
-                if (['pending', 'preparing', 'accepted'].includes(newOrder.orderStatus)) {
+                // Only sound bell for new preparation tasks IF user is kitchen staff
+                if (user.role === 'kitchen' && ['pending', 'preparing', 'accepted'].includes(newOrder.orderStatus)) {
                     playNotificationSound();
                 }
                 return [newOrder, ...prev];
@@ -75,17 +75,17 @@ const WorkingProcess = () => {
                 if (isDone) return prev.filter(o => o._id !== updatedOrder._id);
                 
                 if (existing) {
-                    // Play sound ONLY if new items added to an active prep order
+                    // Play sound ONLY if new items added to an active prep order (KITCHEN ONLY)
                     const oldItems = existing.items?.length || 0;
                     const newItems = updatedOrder.items?.length || 0;
-                    if (newItems > oldItems && ['pending', 'preparing', 'accepted'].includes(status)) {
+                    if (user.role === 'kitchen' && newItems > oldItems && ['pending', 'preparing', 'accepted'].includes(status)) {
                         playNotificationSound();
                     }
                     return prev.map(o => o._id === updatedOrder._id ? updatedOrder : o);
                 }
                 
-                // New prep order coming into range
-                if (['pending', 'preparing', 'accepted'].includes(status)) {
+                // New prep order coming into range (KITCHEN ONLY)
+                if (user.role === 'kitchen' && ['pending', 'preparing', 'accepted'].includes(status)) {
                     playNotificationSound();
                 }
                 return [updatedOrder, ...prev];

@@ -198,10 +198,10 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                         <NavItem to="/admin/notifications" icon={Bell} label="Notifications" color="text-orange-400" badge={unreadCount > 0 ? unreadCount : null} />
                         <NavItem to="/admin/menu" icon={Coffee} label="Menu Items" />
                         <NavItem to="/admin/categories" icon={Layers} label="Categories" />
-                        {/* <SectionLabel>Live Views</SectionLabel>
+                        <SectionLabel>Live Views</SectionLabel>
                         <NavItem to="/kitchen" icon={ChefHat} label="Kitchen View" color="text-orange-400" />
                         <NavItem to="/cashier" icon={Monitor} label="Cashier Point" color="text-green-400" />
-                        <NavItem to="/waiter" icon={Armchair} label="Waiter Board" color="text-yellow-400" /> */}
+                        <NavItem to="/waiter" icon={Armchair} label="Order View" color="text-yellow-400" />
                     </>
                 )}
 
