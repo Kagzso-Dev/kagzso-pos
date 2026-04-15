@@ -13,6 +13,14 @@ const VALID_TRANSITIONS = {
 // @access  Private
 const getTables = async (req, res) => {
     try {
+        const Setting = require('../models/Setting');
+        const settings = await Setting.get();
+        
+        // If tableMapEnabled is disabled, return empty array
+        if (settings.tableMapEnabled === 0 || settings.tableMapEnabled === false) {
+            return res.json([]);
+        }
+        
         const tables = await Table.findAll();
         res.json(tables);
     } catch (error) {

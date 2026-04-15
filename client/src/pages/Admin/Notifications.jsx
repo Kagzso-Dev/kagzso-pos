@@ -2,7 +2,7 @@ import { useState, useContext, useMemo } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import { NotificationContext } from '../../context/NotificationContext';
 import api from '../../api';
-import logoImg from '../../assets/logo.png';
+const logoImg = '/logo.png';
 import {
     Bell, Send, Megaphone, Users, ChefHat, CreditCard,
     ShoppingBag, AlertTriangle, CheckCheck,

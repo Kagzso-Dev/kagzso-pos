@@ -3,9 +3,9 @@ import { AuthContext } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import {
-    TrendingUp, TrendingDown, ShoppingBag, Clock, DollarSign,
+    TrendingUp, TrendingDown, ShoppingBag, Clock, DollarSign, IndianRupee,
     Download, RefreshCw, ChevronDown, FileText,
-    Layers, Utensils, Package, LogOut
+    Layers, Utensils, Package, LogOut, Tag
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -107,11 +107,13 @@ const AdminDashboard = () => {
     const [dbSummary, setDbSummary] = useState(null);
     const [statsLoading, setStatsLoading] = useState(true);
     const [filterType, setFilterType] = useState('all'); // 'all', 'dine-in', 'takeaway'
+    const [offlinePayments, setOfflinePayments] = useState([]);
 
 
     const PER_PAGE = 10;
-    const { user, socket, formatPrice, settings } = useContext(AuthContext);
+    const { user, socket, formatPrice, settings, serverStatus, socketConnected } = useContext(AuthContext);
     const navigate = useNavigate();
+    const isLive = serverStatus === 'online' && socketConnected;
 
     /* ── Fetch Orders ─────────────────────────────────────────────────── */
     const fetchOrders = useCallback(async (forceRefresh = false) => {
@@ -224,6 +226,23 @@ const AdminDashboard = () => {
         };
     }, [user, socket, fetchOrders, fetchStats, fetchGrowth, handleRefresh]);
 
+    /* ── Check for offline payments ──────────────────────────────────────── */
+    useEffect(() => {
+        const checkOffline = () => {
+            const pending = JSON.parse(localStorage.getItem('pendingPayments') || '[]');
+            const pendingOffline = pending.filter(p => p.status === 'pending');
+            setOfflinePayments(pendingOffline);
+        };
+        checkOffline();
+        const interval = setInterval(checkOffline, 10000);
+        const handleOnline = () => checkOffline();
+        window.addEventListener('online', handleOnline);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('online', handleOnline);
+        };
+    }, []);
+
     /* ── DB-backed stat values (from MySQL via API) ───────────────────── */
     // dbStats.today.active/completed/cancelled/revenue from /api/dashboard/stats
     // dbSummary.totalRevenue/orderCount/avgOrderValue from /api/analytics/summary
@@ -231,14 +250,21 @@ const AdminDashboard = () => {
     const completedCount = dbStats?.today?.completed ?? 0;
     const allTimeCount  = dbStats?.allTime           ?? 0;
     const totalRevenue  = dbSummary?.totalRevenue    ?? 0;
+    const totalSgst     = dbSummary?.totalSgst       ?? 0;
+    const totalCgst     = dbSummary?.totalCgst       ?? 0;
     const avgOrderValue = dbSummary?.avgOrderValue   ?? 0;
     const orderCount    = dbSummary?.orderCount      ?? 0;
 
     /* ── Filtered & Paginated Orders ─────────────────────────────────── */
     const filteredOrders = useMemo(() => {
-        if (filterType === 'all') return orders;
-        return orders.filter(o => o.orderType?.toLowerCase() === filterType.toLowerCase());
-    }, [orders, filterType]);
+        // Global setting filter: respect dine-in and takeaway settings
+        const base = orders.filter(o => 
+            (settings?.takeawayEnabled !== false || o.orderType !== 'takeaway') &&
+            (settings?.dineInEnabled !== false || o.orderType !== 'dine-in')
+        );
+        if (filterType === 'all') return base;
+        return base.filter(o => o.orderType?.toLowerCase() === filterType.toLowerCase());
+    }, [orders, filterType, settings?.takeawayEnabled, settings?.dineInEnabled]);
 
     const paginated = useMemo(() => {
         const start = (page - 1) * PER_PAGE;
@@ -275,7 +301,7 @@ const AdminDashboard = () => {
         const ordersData = [
             ['Order ID', 'Type', 'Items', 'Status', 'Date', 'Amount'],
             ...orders.map(o => [
-                o.orderNumber,
+                `${o.orderType === 'dine-in' ? 'DI' : 'TK'}-${String(o.orderNumber).startsWith('ORD-') ? String(o.orderNumber).replace('ORD-', '') : o.orderNumber}`,
                 o.orderType,
                 o.items?.length ?? 0,
                 o.orderStatus,
@@ -294,19 +320,27 @@ const AdminDashboard = () => {
         <div className="space-y-5 animate-fade-in">
 
             {/* ── Page Header ─────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 bg-[var(--theme-bg-card2)] rounded-3xl p-5 sm:p-6 border border-[var(--theme-border)] shadow-xl">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-[var(--theme-text-main)] uppercase tracking-tighter leading-tight flex items-center">
-                        KAGZSO
-                        <span className="text-black font-black ml-2 text-xs sm:text-base uppercase tracking-widest px-2 py-0.5 bg-[var(--theme-bg-dark)] rounded-lg border border-[var(--theme-border)] shadow-inner">
-                            Analytics
-                        </span>
-                    </h1>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-3xl sm:text-4xl font-[900] text-[var(--theme-text-main)] tracking-tight">
+                            Dashboard <span className="text-orange-500">Summary</span>
+                        </h1>
+                        <div className={`
+                            flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest
+                            ${isLive 
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'}
+                        `}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                            {isLive ? 'Live Connection' : 'Disconnected'}
+                        </div>
+                    </div>
+                    <p className="text-[var(--theme-text-subtle)] text-sm font-medium opacity-70">
+                        Welcome back, Admin. Here's your restaurant's performance Overview.
+                    </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    <NotificationBell />
-                    {/* Mobile: Logout | Desktop/Tablet: Refresh */}
-
                     <button
                         onClick={exportExcel}
                         className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/30 min-h-[44px] whitespace-nowrap"
@@ -317,11 +351,39 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
+            {/* ── Offline Payments Alert ───────────────────────────────────── */}
+            {offlinePayments.length > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between animate-fade-in">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                            <Clock size={20} className="text-amber-400" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-amber-400">
+                                {offlinePayments.length} Offline Payment{offlinePayments.length > 1 ? 's' : ''} Pending Sync
+                            </p>
+                            <p className="text-[10px] text-amber-400/70">
+                                These payments were completed offline and will sync when connection is restored
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => {
+                            const pending = JSON.parse(localStorage.getItem('pendingPayments') || '[]');
+                            alert(`Pending: ${pending.length} payment(s)\nStatus: pending`);
+                        }}
+                        className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-xs font-bold"
+                    >
+                        View Details
+                    </button>
+                </div>
+            )}
+
             {/* ── Stats Grid — values sourced from MySQL via API ─────── */}
             {/* Mobile: 1-col → xs: 2-col → md: 2-col (iPad Mini) → xl: 4-col */}
-            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
                 {statsLoading ? (
-                    Array(4).fill(0).map((_, i) => <SkeletonCard key={i} />)
+                    Array(6).fill(0).map((_, i) => <SkeletonCard key={i} />)
                 ) : (
                     <>
                         {/* Total Revenue — MySQL: SUM(final_amount) WHERE payment_status='paid' */}
@@ -329,7 +391,7 @@ const AdminDashboard = () => {
                             title="Total Revenue (30d)"
                             value={formatPrice(totalRevenue)}
                             subtitle={null}
-                            icon={DollarSign}
+                            icon={settings?.currencySymbol === '₹' ? IndianRupee : DollarSign}
                             color="orange"
                             badge={
                                 <div className="flex flex-col items-end gap-1">
@@ -340,13 +402,32 @@ const AdminDashboard = () => {
                                 </div>
                             }
                         />
+
+                        {/* Total SGST — MySQL: SUM(sgst) WHERE payment_status='paid' */}
+                        <StatCard
+                            title="Total SGST (30d)"
+                            value={formatPrice(totalSgst)}
+                            subtitle="Sate GST Collected"
+                            icon={Tag}
+                            color="blue"
+                        />
+
+                        {/* Total CGST — MySQL: SUM(cgst) WHERE payment_status='paid' */}
+                        <StatCard
+                            title="Total CGST (30d)"
+                            value={formatPrice(totalCgst)}
+                            subtitle="Central GST Collected"
+                            icon={Tag}
+                            color="emerald"
+                        />
+
                         {/* Active — MySQL: COUNT(*) WHERE order_status IN ('pending','accepted','preparing','ready') */}
                         <StatCard
                             title="Active Orders"
                             value={activeCount}
                             subtitle={null}
                             icon={ShoppingBag}
-                            color="blue"
+                            color="orange"
                             badge={
                                 <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
                                     Live
@@ -386,7 +467,12 @@ const AdminDashboard = () => {
                             { id: 'all',      icon: <Layers size={13} />,   label: 'All' },
                             { id: 'dine-in',  icon: <Utensils size={13} />, label: 'Dine In' },
                             { id: 'takeaway', icon: <Package size={13} />,  label: 'Takeaway' }
-                        ].map((btn) => (
+                        ]
+                        .filter(btn => 
+                            (btn.id !== 'takeaway' || settings?.takeawayEnabled !== false) &&
+                            (btn.id !== 'dine-in' || settings?.dineInEnabled !== false)
+                        )
+                        .map((btn) => (
                             <button
                                 key={btn.id}
                                 onClick={() => setFilterType(btn.id)}
@@ -440,7 +526,7 @@ const AdminDashboard = () => {
                                             <td className="px-5 py-4 font-black text-[var(--theme-text-main)] whitespace-nowrap text-xs sm:text-sm tracking-tight">
                                                 <div className="flex items-center gap-2">
                                                     {isRecent && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />}
-                                                    {String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                                                    {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                                                 </div>
                                             </td>
                                             <td className="px-5 py-4 hidden xs:table-cell">

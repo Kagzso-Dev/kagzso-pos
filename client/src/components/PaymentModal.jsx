@@ -56,9 +56,21 @@ const playSuccessSound = () => {
  *   api          – axios instance
  */
 const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings }) => {
+    const baseTotal = order?.finalAmount || 0;
+
     const [method, setMethod] = useState(null);
     const [step, setStep] = useState('select'); // select | form | processing | success | error
     const [error, setError] = useState('');
+    const [isOfflinePayment, setIsOfflinePayment] = useState(false);
+
+    // Offer state
+    const [offerApplied, setOfferApplied] = useState(false);
+    const offerLabel = 'Cashier Offer';
+    const discountAmt = offerApplied && settings?.cashierOfferDiscount
+        ? Math.round((baseTotal * settings.cashierOfferDiscount) / 100 * 100) / 100
+        : 0;
+
+    const total = offerApplied ? Math.max(0, baseTotal - discountAmt) : baseTotal;
 
     // Cash state
     const [amountReceived, setAmountReceived] = useState('');
@@ -77,13 +89,8 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
     const [selectedFile, setSelectedFile] = useState(null);
     const [localMsg, setLocalMsg] = useState(null);
 
-    // Offer state
-    const [offerApplied, setOfferApplied] = useState(false);
-
     const modalRef = useRef(null);
     const inputRef = useRef(null);
-
-    const baseTotal = order?.finalAmount || 0;
     const isOrderReady = ['ready', 'readyToServe', 'payment'].includes(order?.orderStatus) && 
                          !order?.isPartiallyReady && 
                          (order?.items || []).every(i => ['READY', 'CANCELLED'].includes(i.status?.toUpperCase()));
@@ -95,12 +102,6 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
             setStep('error');
         }
     }, [isOrderReady, step]);
-
-    const offerEnabled = settings?.cashierOfferEnabled && settings?.cashierOfferDiscount > 0;
-    const offerPct = settings?.cashierOfferDiscount || 0;
-    const offerLabel = settings?.cashierOfferLabel || 'Special Offer';
-    const discountAmt = offerApplied ? Math.round(baseTotal * (offerPct / 100) * 100) / 100 : 0;
-    const total = Math.max(0, Math.round((baseTotal - discountAmt) * 100) / 100);
 
     /* ── Initiate payment on mount ────────────────────────────────── */
     useEffect(() => {
@@ -253,23 +254,40 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
         setStep('processing');
         setError('');
 
-        try {
-            const payload = {
-                paymentMethod: method.id,
-                amountReceived: method.id === 'cash'
-                    ? parseFloat(amountReceived)
-                    : parseFloat(paidAmount),
-                transactionId: null,
-                ...(offerApplied && { discount: discountAmt, discountLabel: offerLabel }),
-            };
+        const payload = {
+            paymentMethod: method.id,
+            amountReceived: method.id === 'cash'
+                ? parseFloat(amountReceived)
+                : parseFloat(paidAmount),
+            transactionId: null,
+            ...(offerApplied && { discount: discountAmt, discountLabel: offerLabel }),
+        };
 
+        if (!navigator.onLine) {
+            const pending = JSON.parse(localStorage.getItem('pendingPayments') || '[]');
+            pending.push({
+                orderId: order._id,
+                payload,
+                createdAt: Date.now(),
+                status: 'pending'
+            });
+            localStorage.setItem('pendingPayments', JSON.stringify(pending));
+            setChange(method.id === 'cash' ? parseFloat(amountReceived) - total : 0);
+            setIsOfflinePayment(true);
+            setStep('success');
+            setTimeout(() => {
+                onSuccess?.({ payment: { changeAmount: method.id === 'cash' ? parseFloat(amountReceived) - total : 0 }, offline: true });
+            }, 2500);
+            return;
+        }
+
+        try {
             const res = await api.post(`/api/payments/${order._id}/process`, payload);
 
             playSuccessSound();
             setChange(res.data.payment?.changeAmount || 0);
             setStep('success');
 
-            // Notify parent after animation
             setTimeout(() => {
                 onSuccess?.(res.data);
             }, 2500);
@@ -285,21 +303,21 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
         <div
             ref={modalRef}
             onClick={handleBackdrop}
-            className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-[4px] animate-cross-fade p-4"
+            className="fixed inset-0 z-[10000] flex items-center sm:justify-center bg-black/60 backdrop-blur-[4px] animate-cross-fade p-2 sm:p-4"
         >
             <div className={`
-                relative w-[380px] max-w-[95vw] max-h-[80vh]
+                relative w-full sm:w-[380px] max-w-[95vw] sm:max-w-[380px] max-h-[85vh] sm:max-h-[80vh]
                 bg-white dark:bg-[var(--theme-bg-card)] border border-[var(--theme-border)]
                 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)]
                 flex flex-col
                 ${step === 'success' ? 'animate-fade-in-scale' : 'animate-pop-in'}
-                rounded-[2.5rem] overflow-hidden
+                rounded-2xl sm:rounded-[2.5rem] overflow-hidden
             `}>
 
 
                 {/* ── Header ──────────────────────────────────────── */}
-                <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--theme-border)] flex-shrink-0 bg-white dark:bg-[var(--theme-bg-card)]">
-                    <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--theme-text-main)]">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 border-b border-[var(--theme-border)] flex-shrink-0 bg-white dark:bg-[var(--theme-bg-card)]">
+                    <h2 className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-[var(--theme-text-main)]">
                         {step === 'success' ? 'Payment Success' : 'Checkout & Pay'}
                     </h2>
                     <button 
@@ -314,24 +332,24 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
                 <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
                     {/* ── Amount Banner ───────────────────────────────── */}
                     {step !== 'success' && step !== 'processing' && (
-                        <div className="px-6 py-6 bg-gradient-to-br from-[var(--theme-bg-muted)]/10 to-transparent border-b border-[var(--theme-border)] flex-shrink-0 animate-fade-in relative overflow-hidden">
+                        <div className="px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-br from-[var(--theme-bg-muted)]/10 to-transparent border-b border-[var(--theme-border)] flex-shrink-0 animate-fade-in relative overflow-hidden">
                             <div className="flex items-center justify-between gap-4 relative z-10">
                                 {/* Order Context Badges */}
                                 <div className="flex flex-col gap-1.5 shrink-0">
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-[9px] font-black bg-white dark:bg-white/5 rounded-full px-3 py-1.5 text-[var(--theme-text-main)] border border-[var(--theme-border)] shadow-sm uppercase tracking-wider">
-                                            {String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                                        <span className="text-[8px] sm:text-[9px] font-black bg-white dark:bg-white/5 rounded-full px-2 sm:px-3 py-1.5 text-[var(--theme-text-main)] border border-[var(--theme-border)] shadow-sm uppercase tracking-wider">
+                                            {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                                         </span>
                                     </div>
-                                    <span className="text-[9px] w-fit font-black bg-orange-500/10 rounded-full px-3 py-1.5 text-orange-500 border border-orange-500/20 uppercase tracking-wider leading-none">
+                                    <span className="text-[8px] sm:text-[9px] w-fit font-black bg-orange-500/10 rounded-full px-2 sm:px-3 py-1.5 text-orange-500 border border-orange-500/20 uppercase tracking-wider leading-none">
                                         {order.orderType === 'dine-in' ? `Table ${order.tableId?.number || '?'}` : `Token ${order.tokenNumber}`}
                                     </span>
                                 </div>
 
                                 <div className="flex flex-col items-end gap-0.5 min-w-0">
-                                    <p className="text-[9px] text-[var(--theme-text-muted)] font-black uppercase tracking-[0.25em] mb-1 opacity-60">Grand Total</p>
+                                    <p className="text-[8px] sm:text-[9px] text-[var(--theme-text-muted)] font-black uppercase tracking-[0.25em] mb-1 opacity-60">Grand Total</p>
                                     <div className="flex flex-col items-end leading-none">
-                                        <p className="text-3xl xs:text-4xl font-black text-orange-500 tracking-tighter drop-shadow-xl animate-fade-in-up whitespace-nowrap">
+                                        <p className="text-2xl sm:text-3xl xs:text-4xl font-black text-orange-500 tracking-tighter drop-shadow-xl animate-fade-in-up whitespace-nowrap">
                                             {formatPrice(total)}
                                         </p>
                                     </div>
@@ -367,7 +385,7 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
 
                     {/* ── Step 1: Method Selection ───────────────── */}
                     {step === 'select' && (
-                        <div className="p-5 space-y-3">
+                        <div className="p-4 sm:p-5 space-y-3">
                             <div className="flex flex-col gap-2 relative z-10">
                                 {METHODS.map(m => (
                                     <button
@@ -401,7 +419,7 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
 
                     {/* ── Step 2: Payment Form ───────────────────── */}
                     {step === 'form' && method && (
-                        <div className="p-5 space-y-4">
+                        <div className="p-4 sm:p-5 space-y-4">
                             {/* Method indicator */}
                             <div className="flex items-center gap-3">
                                 <button
@@ -588,51 +606,59 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
 
                     {/* ── Processing State ────────────────────────── */}
                     {step === 'processing' && (
-                        <div className="p-12 flex flex-col items-center text-center">
-                            <div className="relative w-20 h-20 mb-6">
+                        <div className="p-8 sm:p-12 flex flex-col items-center text-center">
+                            <div className="relative w-16 sm:w-20 h-16 sm:h-20 mb-4 sm:mb-6">
                                 <div className="absolute inset-0 border-4 border-orange-500/20 rounded-full" />
                                 <div className="absolute inset-0 border-4 border-t-orange-500 rounded-full animate-spin" />
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <Loader2 size={24} className="text-orange-400 animate-spin" />
+                                    <Loader2 size={20} sm:size={24} className="text-orange-400 animate-spin" />
                                 </div>
                             </div>
-                            <p className="text-lg font-bold text-[var(--theme-text-main)]">Processing Payment...</p>
-                            <p className="text-sm text-[var(--theme-text-muted)] mt-1">Please wait, do not close this window</p>
+                            <p className="text-base sm:text-lg font-bold text-[var(--theme-text-main)]">Processing Payment...</p>
+                            <p className="text-xs sm:text-sm text-[var(--theme-text-muted)] mt-1">Please wait, do not close this window</p>
                         </div>
                     )}
 
                     {/* ── Success State ───────────────────────────── */}
                     {step === 'success' && (
-                        <div className="p-8 flex flex-col items-center text-center animate-scale-in">
-                            <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/30 animate-bounce">
-                                <CheckCircle size={40} className="text-white" />
+                        <div className="p-6 sm:p-8 flex flex-col items-center text-center animate-scale-in">
+                            <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-full bg-emerald-500 flex items-center justify-center mb-4 sm:mb-5 shadow-lg shadow-emerald-500/30 animate-bounce">
+                                <CheckCircle size={32} sm:size={40} className="text-white" />
                             </div>
-                            <h3 className="text-2xl font-black text-[var(--theme-text-main)] mb-1">Payment Successful!</h3>
-                            <p className="text-emerald-400 text-sm font-medium mb-4">
+                            <h3 className="text-xl sm:text-2xl font-black text-[var(--theme-text-main)] mb-1">Payment Successful!</h3>
+                            <p className="text-emerald-400 text-xs sm:text-sm font-medium mb-3 sm:mb-4">
                                 {method?.label} • {formatPrice(total)}
                                 {offerApplied && <span className="ml-2 text-amber-400 text-xs">({offerLabel} applied)</span>}
                             </p>
 
                             {method?.id === 'cash' && change > 0 && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 w-full max-w-[250px] mb-4">
+                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 sm:p-4 w-full max-w-[250px] mb-3 sm:mb-4">
                                     <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider mb-1">Change to Return</p>
-                                    <p className="text-3xl font-black text-emerald-400">{formatPrice(change)}</p>
+                                    <p className="text-2xl sm:text-3xl font-black text-emerald-400">{formatPrice(change)}</p>
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-2 mt-2">
-                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                                <p className="text-xs text-[var(--theme-text-muted)]">
-                                    KOT closed • Order completed • Closing...
-                                </p>
-                            </div>
+                            {isOfflinePayment ? (
+                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2 mt-3 animate-fade-in">
+                                    <p className="text-xs text-amber-400 font-bold uppercase tracking-wider">
+                                        Offline Payment • Will sync when online
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 mt-2">
+                                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                                    <p className="text-xs text-[var(--theme-text-muted)]">
+                                        KOT closed • Order completed • Closing...
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
 
                     {/* ── Footer / Submit Button ── */}
                     {step === 'form' && (
-                        <div className="flex-shrink-0 flex flex-col gap-2 xs:gap-3 p-5 xs:p-8 border-t border-[var(--theme-border)] bg-gray-50/50 dark:bg-black/20 pb-4 safe-bottom">
+                        <div className="flex-shrink-0 flex flex-col gap-2 xs:gap-3 p-4 sm:p-5 xs:p-8 border-t border-[var(--theme-border)] bg-gray-50/50 dark:bg-black/20 pb-4 sm:pb-6 safe-bottom">
                             <button
                                 onClick={handleSubmit}
                                 disabled={!isFormValid()}
@@ -650,12 +676,12 @@ const PaymentModal = ({ order, formatPrice, onClose, onSuccess, api, settings })
 
                     {/* Success/Error Close Button */}
                     {(step === 'success' || step === 'error') && (
-                        <div className="flex-shrink-0 p-5 xs:p-8 border-t border-[var(--theme-border)] bg-gray-50/50 dark:bg-black/10 pb-4 safe-bottom">
+                        <div className="flex-shrink-0 p-4 sm:p-5 xs:p-8 border-t border-[var(--theme-border)] bg-gray-50/50 dark:bg-black/10 pb-4 sm:pb-6 safe-bottom">
                              <button
                                 onClick={handleClose}
-                                className="w-full h-14 xs:h-16 flex items-center justify-center text-[12px] xs:text-[13px] text-[var(--theme-text-muted)] font-black uppercase tracking-widest hover:bg-gray-100 dark:hover:bg-white/5 rounded-[1.2rem] xs:rounded-[1.5rem] transition-all active:scale-95 border border-[var(--theme-border)] group"
+                                className="w-full h-12 sm:h-14 xs:h-16 flex items-center justify-center text-[11px] sm:text-[12px] xs:text-[13px] text-[var(--theme-text-muted)] font-black uppercase tracking-widest hover:bg-gray-100 dark:hover:bg-white/5 rounded-[1.2rem] xs:rounded-[1.5rem] transition-all active:scale-95 border border-[var(--theme-border)] group"
                             >
-                                {step === 'success' ? 'Close & Return' : 'Back to Orders'}
+                                {step === 'success' ? 'Good to Completed ✓' : 'Back to Orders'}
                                 <ArrowRight size={14} className="ml-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                             </button>
                         </div>

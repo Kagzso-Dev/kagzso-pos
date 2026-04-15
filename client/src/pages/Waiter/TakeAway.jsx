@@ -1,7 +1,8 @@
-import { useState, useContext, useEffect, useMemo, useCallback } from 'react';
+import { useState, useContext, useEffect, useMemo, useCallback, useRef } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
+import { queueOrder } from '../../utils/syncEngine';
 import {
     Search, ShoppingCart, ArrowLeft, ArrowRight,
     Utensils, ChevronLeft, SearchX, Trash2, Plus, Minus,
@@ -13,6 +14,7 @@ import FoodItem from '../../components/FoodItem';
 import useMenuData from '../../hooks/useMenuData';
 import useDebounce from '../../hooks/useDebounce';
 import OptimizedImage from '../../components/OptimizedImage';
+import { calculateTax } from '../../utils/tax';
 
 /**
  * Take Away Order Page
@@ -24,7 +26,10 @@ const TakeAway = () => {
 
     // Redirect away if takeaway is disabled in settings
     useEffect(() => {
-        if (settings && settings.takeawayEnabled === false) {
+        console.log('[TakeAway] settings:', settings);
+        console.log('[TakeAway] takeawayEnabled:', settings?.takeawayEnabled);
+        if (settings?.takeawayEnabled === false || settings?.takeawayEnabled === 0) {
+            console.log('[TakeAway] Redirecting - takeaway disabled!');
             navigate('/waiter', { replace: true });
         }
     }, [settings, navigate]);
@@ -37,6 +42,7 @@ const TakeAway = () => {
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [userInteracted, setUserInteracted] = useState(false);
+    const prevCartLength = useRef(0);
     const [viewMode, setViewMode] = useState(() => {
         const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
         if (isMobile && settings?.mobileMenuView) return settings.mobileMenuView;
@@ -80,7 +86,11 @@ const TakeAway = () => {
             }
         };
         socket.on('menu-updated', onMenuUpdated);
-        return () => socket.off('menu-updated', onMenuUpdated);
+        socket.on('itemUpdated', onMenuUpdated);
+        return () => {
+            socket.off('menu-updated', onMenuUpdated);
+            socket.off('itemUpdated', onMenuUpdated);
+        };
     }, [socket]);
 
     const addToCart = useCallback((item, variant = null) => {
@@ -88,9 +98,20 @@ const TakeAway = () => {
         const price = variant ? variant.price : item.price;
         setCart(prev => {
             const existing = prev.find(i => i.cartKey === cartKey);
-            if (existing) return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: i.quantity + 1 } : i);
+            if (existing) {
+                console.log('Cart updated: Quantity increased for', item.name);
+                return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: i.quantity + 1 } : i);
+            }
+            console.log('Cart updated: Item added -', item.name);
             return [...prev, { ...item, cartKey, price, variant: variant || null, quantity: 1, notes: '' }];
         });
+    }, []);
+
+    const resetOrderSession = useCallback(() => {
+        console.log('Cart empty – session reset');
+        setCart([]);
+        setIsCartOpen(false);
+        console.log('New order started');
     }, []);
 
     const updateQuantity = useCallback((cartKey, delta) => {
@@ -98,17 +119,34 @@ const TakeAway = () => {
             const existing = prev.find(i => i.cartKey === cartKey);
             if (!existing) return prev;
             const newQty = existing.quantity + delta;
-            if (newQty <= 0) return prev.filter(i => i.cartKey !== cartKey);
+            if (newQty <= 0) {
+                console.log('Item removed:', existing.name);
+                return prev.filter(i => i.cartKey !== cartKey);
+            }
+            console.log('Cart updated:', existing.name, 'quantity set to', newQty);
             return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: newQty } : i);
         });
     }, []);
+
+    // Effect to handle full reset when cart becomes empty
+    useEffect(() => {
+        if (prevCartLength.current > 0 && cart.length === 0) {
+            // User manually removed last item – trigger reset
+            resetOrderSession();
+        }
+        prevCartLength.current = cart.length;
+    }, [cart.length, resetOrderSession]);
 
     const handleItemAdd = (item, variant = null) => {
         if (!variant && item.variants?.length > 0) return;
         addToCart(item, variant);
     };
 
-    const clearCart = () => { if (window.confirm('Clear all items?')) setCart([]); };
+    const clearCart = () => { 
+        if (window.confirm('Clear all items?')) {
+            resetOrderSession();
+        }
+    };
 
     // ── Deduplicated categories ──────────────────────────────────────────
     const categories = useMemo(() => {
@@ -140,11 +178,10 @@ const TakeAway = () => {
     }, [cart]);
 
     const totalAmount = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart]);
-    const sgst = settings?.sgst || 0;
-    const cgst = settings?.cgst || 0;
-    const sValue = totalAmount * (sgst / 100);
-    const cValue = totalAmount * (cgst / 100);
-    const finalAmount = totalAmount + sValue + cValue;
+    
+    // Use centralized utility
+    const taxResults = calculateTax(totalAmount, settings, { discount: 0 });
+    const { sgst: sValue, cgst: cValue, finalAmount, sgstRate, cgstRate } = taxResults;
 
     const handleSubmitOrder = async () => {
         if (!socketConnected) {
@@ -168,8 +205,19 @@ const TakeAway = () => {
                 headers: { Authorization: `Bearer ${user.token}` },
             });
             navigate('/waiter', { replace: true });
-        } catch (err) {
-            alert('Order failed: ' + (err.response?.data?.message || 'Server Error'));
+        } catch (apiErr) {
+            console.log('[TakeAway] Order failed, queuing offline:', apiErr.message);
+            const { localId, tokenNumber } = await queueOrder({
+                tableId: null,
+                type: orderType,
+                items: orderData.items,
+                totalAmount: orderData.totalAmount,
+                sgst: orderData.sgst,
+                cgst: orderData.cgst,
+                finalAmount: orderData.finalAmount,
+            });
+            alert(`Order saved offline with token TK${tokenNumber}. Will sync when online.`);
+            navigate('/waiter', { replace: true });
         }
     };
 
@@ -362,47 +410,66 @@ const TakeAway = () => {
                         </div>
 
                         {/* Scrollable items */}
-                        <div className="flex-1 kot-scroll px-4 py-4 space-y-3 custom-scrollbar">
+                        <div className="flex-1 kot-scroll px-4 py-4 space-y-3 custom-scrollbar flex flex-col">
                             {cart.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center text-[var(--theme-text-muted)] py-10">
-                                    <ShoppingCart size={64} className="mb-4 opacity-5" strokeWidth={1} />
-                                    <p className="font-bold">Your cart is empty</p>
-                                    <p className="text-xs">Add items from the menu to build your order</p>
+                                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 animate-fade-in bg-blue-500/5 m-2 rounded-[2rem] border-2 border-dashed border-blue-500/20">
+                                    <div className="w-20 h-20 rounded-full bg-[var(--theme-bg-dark)] flex items-center justify-center mb-5 border border-[var(--theme-border)] shadow-xl relative">
+                                        <ShoppingCart size={28} className="text-blue-400 opacity-20" />
+                                        <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-lg">
+                                            <Plus size={14} strokeWidth={3} />
+                                        </div>
+                                    </div>
+                                    <h3 className="text-md font-black text-[var(--theme-text-main)] uppercase tracking-tight mb-1">Cart is empty</h3>
+                                    <p className="text-[10px] text-[var(--theme-text-muted)] max-w-[180px] font-bold leading-relaxed opacity-60">
+                                        Select items from the menu to build your takeaway order.
+                                    </p>
                                 </div>
                             ) : (
                                 cart.map(item => (
-                                    <div key={item.cartKey} className="flex items-center gap-3 animate-slide-up hover:bg-blue-500/5 p-1 -m-1 rounded-xl transition-colors group">
+                                    <div key={item.cartKey} className="flex items-start gap-4 animate-slide-up hover:bg-blue-500/5 p-2 -m-1 rounded-2xl transition-all group border border-transparent hover:border-[var(--theme-border)]/50">
                                             <OptimizedImage 
                                                 src={item.image} 
                                                 alt={item.name} 
                                                 width={100}
-                                                containerClassName="w-10 h-10 rounded-lg flex-shrink-0 shadow-sm"
+                                                containerClassName="w-12 h-12 rounded-xl flex-shrink-0 shadow-lg border border-[var(--theme-border)]/30 overflow-hidden"
                                             />
-                                        <div className="flex-1 min-w-0 flex items-center justify-between gap-1.5">
-                                            <div className="min-w-0 flex-1 pr-1">
-                                                <h4 className="text-[12px] font-black text-[var(--theme-text-main)] truncate leading-tight uppercase tracking-tighter">{item.name}</h4>
-                                                {item.variant && <p className="text-[8px] font-black text-blue-500 uppercase leading-none mt-0.5">{item.variant.name}</p>}
+                                        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <h4 className="text-[13px] font-medium text-[var(--theme-text-main)] line-clamp-2 leading-tight uppercase tracking-tight group-hover:text-blue-500 transition-colors">
+                                                        {item.name}
+                                                    </h4>
+                                                    {item.variant && (
+                                                        <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-1 bg-blue-500/10 px-1.5 py-0.5 rounded-md inline-block">
+                                                            {item.variant.name}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <span className="text-[13px] font-black text-blue-500 tabular-nums tracking-tighter shrink-0">
+                                                    {formatPrice(item.price * item.quantity)}
+                                                </span>
                                             </div>
 
-                                            <div className="flex items-center shrink-0">
-                                                <div className="flex items-center bg-[var(--theme-bg-dark)] rounded-full p-0.5 border border-[var(--theme-border)] shadow-inner">
+                                            <div className="flex items-center justify-between mt-1">
+                                                <div className="flex items-center bg-[var(--theme-bg-dark)] rounded-xl p-0.5 border border-[var(--theme-border)] shadow-inner">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); updateQuantity(item.cartKey, -1); }}
-                                                        className="w-6 h-6 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-blue-500 transition-all active:scale-75"
+                                                        className="w-7 h-7 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all active:scale-75"
                                                     >
-                                                        <Minus size={11} strokeWidth={3} />
+                                                        <Minus size={12} strokeWidth={3} />
                                                     </button>
-                                                    <span className="w-5 text-center text-[10px] font-black text-[var(--theme-text-main)] tabular-nums">{item.quantity}</span>
+                                                    <span className="w-8 text-center text-[11px] font-black text-[var(--theme-text-main)] tabular-nums">{item.quantity}</span>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); updateQuantity(item.cartKey, 1); }}
-                                                        className="w-6 h-6 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-blue-500 transition-all active:scale-75"
+                                                        className="w-7 h-7 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all active:scale-75"
                                                     >
-                                                        <Plus size={11} strokeWidth={3} />
+                                                        <Plus size={12} strokeWidth={3} />
                                                     </button>
                                                 </div>
+                                                <span className="text-[9px] font-bold text-[var(--theme-text-muted)] uppercase tracking-widest opacity-40">
+                                                    {formatPrice(item.price)} ea
+                                                </span>
                                             </div>
-
-                                            <span className="text-[12px] font-black text-blue-500 min-w-[50px] text-right tabular-nums tracking-tighter shrink-0">{formatPrice(item.price * item.quantity)}</span>
                                         </div>
                                     </div>
                                 ))
@@ -413,8 +480,8 @@ const TakeAway = () => {
                         <div className="flex-shrink-0 p-4 bg-[var(--theme-bg-dark)] border-t border-[var(--theme-border)] space-y-3">
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>Subtotal</span><span>{formatPrice(totalAmount)}</span></div>
-                                {sgst > 0 && <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>SGST ({sgst}%)</span><span>{formatPrice(totalAmount * sgst / 100)}</span></div>}
-                                {cgst > 0 && <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>CGST ({cgst}%)</span><span>{formatPrice(totalAmount * cgst / 100)}</span></div>}
+                                {sgstRate > 0 && <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>SGST ({sgstRate}%)</span><span>{formatPrice(totalAmount * sgstRate / 100)}</span></div>}
+                                {cgstRate > 0 && <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>CGST ({cgstRate}%)</span><span>{formatPrice(totalAmount * cgstRate / 100)}</span></div>}
                                 <div className="flex justify-between items-center pt-1.5 border-t border-[var(--theme-border)]">
                                     <span className="text-xs font-bold text-[var(--theme-text-main)] uppercase tracking-wider">Total</span>
                                     <span className="text-xl font-black text-blue-400">{formatPrice(finalAmount)}</span>
@@ -531,6 +598,48 @@ const TakeAway = () => {
                 </div>,
                 document.body
             )}
+            
+            {/* ── Mobile Floating Cart Bar ── */}
+            <FloatingCartBar 
+                cart={cart} 
+                isCartOpen={isCartOpen} 
+                setIsCartOpen={setIsCartOpen} 
+                formatPrice={formatPrice}
+                finalAmount={finalAmount}
+            />
+        </div>
+    );
+};
+
+/* ── Mobile Floating Cart Bar (Same as DineIn for consistency) ── */
+const FloatingCartBar = ({ cart, isCartOpen, setIsCartOpen, formatPrice, finalAmount }) => {
+    if (isCartOpen) return null;
+    return (
+        <div className="md:hidden fixed bottom-6 left-4 right-4 z-[90] animate-in slide-in-from-bottom-10 fade-in duration-500">
+            <button
+                onClick={() => setIsCartOpen(true)}
+                className="w-full h-14 bg-gray-900 text-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.3)] flex items-center justify-between px-5 active:scale-[0.98] transition-all overflow-hidden relative group"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <ShoppingCart size={20} className="text-blue-400" />
+                        {cart.length > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center text-[9px] font-black border border-gray-900">
+                                {cart.length}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex flex-col items-start leading-tight">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">View Cart</span>
+                        <span className="text-sm font-black">{formatPrice(finalAmount)}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-black uppercase tracking-[0.1em]">Place Order</span>
+                    <ChevronLeft size={16} strokeWidth={3} className="text-blue-400 rotate-180" />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            </button>
         </div>
     );
 };

@@ -8,7 +8,7 @@ const { cacheMiddleware } = require('../utils/cache');
 router.use(protect);
 
 router.route('/')
-    .get(cacheMiddleware(3600, 'categories'), getCategories)
+    .get(getCategories)
     .post(authorize('admin'), createCategory);
 
 router.route('/:id')

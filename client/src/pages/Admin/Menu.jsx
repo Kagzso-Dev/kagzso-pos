@@ -1,6 +1,8 @@
 import { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
+import { getMenus, saveMenus, getCategories, saveCategories } from '../../db/db';
+import { queueAction } from '../../utils/syncEngine';
 import { Plus, Search, SearchX, Utensils, Upload, X } from 'lucide-react';
 import ViewToggle from '../../components/ViewToggle';
 import FoodItem from '../../components/FoodItem';
@@ -108,6 +110,16 @@ const AdminMenu = () => {
     };
 
     const fetchData = async () => {
+        if (!navigator.onLine) {
+            const { getMenus, getCategories } = await import('../../db/db');
+            const [cachedItems, cachedCategories] = await Promise.all([
+                getMenus(),
+                getCategories(),
+            ]);
+            setItems(cachedItems || []);
+            setCategories(cachedCategories || []);
+            return;
+        }
         try {
             const [menuRes, catRes] = await Promise.all([
                 api.get('/api/menu'),
@@ -117,27 +129,45 @@ const AdminMenu = () => {
             setCategories(catRes.data);
         } catch (error) {
             console.error(error);
+            const { getMenus, getCategories } = await import('../../db/db');
+            const [cachedItems, cachedCategories] = await Promise.all([
+                getMenus(),
+                getCategories(),
+            ]);
+            setItems(cachedItems || []);
+            setCategories(cachedCategories || []);
         }
     };
 
     const handleDelete = async (id) => {
         if (!window.confirm('Permanently delete this item?')) return;
         try {
+            if (!navigator.onLine) {
+                const action = { type: 'menu', method: 'DELETE', endpoint: `/api/menu/${id}` };
+                await queueAction(action);
+                setItems(prev => prev.filter(i => String(i._id) !== String(id)));
+                alert('Item will be deleted when online.');
+                return;
+            }
             await api.delete(`/api/menu/${id}`, { headers: { Authorization: `Bearer ${user.token}` } });
-            // Socket event will remove from state; also remove optimistically in case socket is slow
             setItems(prev => prev.filter(i => String(i._id) !== String(id)));
         } catch (error) {
             alert(error.response?.data?.message || 'Failed to delete item');
         }
     };
 
-    // Quick toggle availability without opening modal
     const handleToggleAvailability = async (item) => {
         try {
+            if (!navigator.onLine) {
+                const action = { type: 'menu', method: 'PUT', endpoint: `/api/menu/${item._id}`, data: { availability: !item.availability } };
+                await queueAction(action);
+                setItems(prev => prev.map(i => i._id === item._id ? { ...i, availability: !item.availability } : i));
+                alert('Availability will be updated when online.');
+                return;
+            }
             await api.put(`/api/menu/${item._id}`, { availability: !item.availability }, {
                 headers: { Authorization: `Bearer ${user.token}` },
             });
-            // Socket event 'menu-updated' will update the state
         } catch (error) {
             alert(error.response?.data?.message || 'Failed to update availability');
         }
@@ -152,11 +182,29 @@ const AdminMenu = () => {
         const submitData = { ...formData, variants: cleanVariants };
         try {
             if (editingItem) {
+                if (!navigator.onLine) {
+                    const action = { type: 'menu', method: 'PUT', endpoint: `/api/menu/${editingItem._id}`, data: submitData };
+                    await queueAction(action);
+                    setItems(prev => prev.map(i => i._id === editingItem._id ? { ...i, ...submitData } : i));
+                    alert('Item will be updated when online.');
+                    closeModal();
+                    return;
+                }
                 const res = await api.put(`/api/menu/${editingItem._id}`, submitData, {
                     headers: { Authorization: `Bearer ${user.token}` },
                 });
                 setItems(prev => prev.map(i => i._id === editingItem._id ? res.data : i));
             } else {
+                if (!navigator.onLine) {
+                    const localId = `local_menu_${Date.now()}`;
+                    const newItem = { ...submitData, _id: localId, availability: true };
+                    setItems(prev => [...prev, newItem]);
+                    const action = { type: 'menu', method: 'POST', endpoint: '/api/menu', data: submitData };
+                    await queueAction(action);
+                    alert('Item will be created when online.');
+                    closeModal();
+                    return;
+                }
                 const res = await api.post('/api/menu', submitData, {
                     headers: { Authorization: `Bearer ${user.token}` },
                 });

@@ -54,8 +54,6 @@ export default defineConfig(({ mode }) => ({
     port: 5173,
     host: true,
     strictPort: true,
-    hmr: {
-      host: 'localhost',
-    },
+    hmr: true,
   },
 }));

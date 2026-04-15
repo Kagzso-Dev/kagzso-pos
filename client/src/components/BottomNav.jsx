@@ -38,13 +38,11 @@ const BottomNav = memo(() => {
             { to: '/cashier', icon: Monitor, label: 'POS' },
             { to: '/cashier/working-process', icon: ClipboardList, label: 'Orders' },
             { to: '/waiter', icon: Grid, label: 'Tokens' },
-            { to: '/cashier/kitchen-view', icon: ChefHat, label: 'Kitchen' },
         ];
         if (user.role === 'waiter') return [
             { to: '/waiter', icon: LayoutDashboard, label: 'Dashboard' },
             { to: '/dine-in', icon: Utensils, label: 'Dine In' },
             { to: '/take-away', icon: Package, label: 'Take Away' },
-            { to: '/waiter/kitchen-view', icon: ChefHat, label: 'Kitchen' },
         ];
         return [];
     }, [user.role]);

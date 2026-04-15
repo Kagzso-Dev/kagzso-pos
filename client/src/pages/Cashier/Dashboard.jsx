@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../api';
-import logoImg from '../../assets/logo.png';
+import { getCachedOrders, getPendingOrders } from '../../db/db';
+const logoImg = '/logo.png';
 import PaymentModal from '../../components/PaymentModal';
 import CancelOrderModal from '../../components/CancelOrderModal';
 import StatusBadge from '../../components/StatusBadge';
@@ -12,7 +13,7 @@ import { printBill } from '../../components/BillPrint';
 import {
     Printer, Banknote, CheckCircle,
     ShoppingBag, RefreshCw, ArrowLeft,
-    Clock, AlertTriangle, Grid, List, LogOut, XCircle
+    Clock, AlertTriangle, Grid, List, LogOut, ChefHat
 } from 'lucide-react';
 
 /* ── Order List Item ──────────────────────────────────────────────────────── */
@@ -33,7 +34,7 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
             ready:     { bg: 'bg-emerald-50 border-emerald-300',text: 'text-emerald-700',dot: 'bg-emerald-500',label: 'bg-emerald-100 text-emerald-800' },
             readytoserve: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-600', dot: 'bg-blue-500', label: 'bg-blue-100 text-blue-700' },
             payment:   { bg: 'bg-rose-50 border-rose-300 shadow-rose-200', text: 'text-rose-700', dot: 'bg-rose-600', label: 'bg-rose-100 text-rose-800' },
-            completed: { bg: 'bg-gray-100 border-gray-300',   text: 'text-gray-800',   dot: 'bg-gray-600',   label: 'bg-gray-200 text-gray-800' }
+            completed: { bg: 'bg-red-50 border-red-300',   text: 'text-red-700',   dot: 'bg-red-500',   label: 'bg-red-100 text-red-800' }
         }[currentStatus] || { bg: 'bg-gray-50 border-gray-100', text: 'text-gray-400', dot: 'bg-gray-300', label: 'bg-gray-100 text-gray-500' };
 
     if (isGrid) {
@@ -82,18 +83,20 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
     }
 
     const tColor = tokenColors[order.orderStatus] || 'bg-[var(--theme-bg-card)] border-[var(--theme-border)] text-[var(--theme-text-main)]';
+    const isPaid = order.paymentStatus === 'paid';
     return (
         <button
             onClick={onClick}
             className={`
                 w-full text-left transition-all duration-200 group token-tap rounded-2xl
                 ${tColor}
-                ${isList ? 'p-3 border-l-[6px]' : 'p-3.5 border-l-[8px]'}
-                ${order.orderStatus === 'pending' ? 'border-l-[var(--status-pending)]' :
+                ${order.paymentStatus === 'paid' ? 'border-l-red-500 bg-red-500/10' :
+                  isList ? 'p-3 border-l-[6px]' : 'p-3.5 border-l-[8px]'}
+                ${order.paymentStatus !== 'paid' && (order.orderStatus === 'pending' ? 'border-l-[var(--status-pending)]' :
                   order.orderStatus === 'ready' ? 'border-l-[var(--status-ready)]' :
                   order.orderStatus === 'readyToServe' ? 'border-l-[var(--status-readyToServe)]' :
                   order.orderStatus === 'payment' ? 'border-l-[var(--status-payment)]' :
-                  'border-l-transparent'}
+                  'border-l-transparent')}
                 ${selected ? 'ring-2 ring-orange-500 shadow-xl scale-[1.01]' : 'hover:scale-[1.005] shadow-md'}
             `}
         >
@@ -104,7 +107,7 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
                         <span className="inline-flex items-center justify-center min-w-[32px] h-6 font-black text-inherit text-[9px] px-1.5 bg-black/10 rounded-lg border border-current/20 shrink-0 whitespace-nowrap">
                             {order.orderType === 'dine-in' ? `T${order.tableId?.number || order.tableId || '?'}` : `TK${order.tokenNumber}`}
                         </span>
-                        <p className="text-[10px] font-black text-inherit truncate leading-none">{order.orderNumber}</p>
+                        <p className="text-[10px] font-black text-inherit truncate leading-none">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                         <p className="text-[11px] font-black text-inherit whitespace-nowrap">{formatPrice(order.finalAmount)}</p>
@@ -115,7 +118,7 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
                 /* ── Normal card ── */
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-extrabold text-inherit tracking-tight truncate pr-2">{order.orderNumber}</h3>
+                        <h3 className="text-sm font-extrabold text-inherit tracking-tight truncate pr-2">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</h3>
                         <StatusBadge status={order.orderStatus} />
                     </div>
                     <div className="flex items-center justify-between">
@@ -142,16 +145,11 @@ const OrderItem = memo(({ order, selected, onClick, formatPrice, viewType = 'nor
 /* ── Receipt ──────────────────────────────────────────────────────────────── */
 const Receipt = ({ order, formatPrice, settings }) => (
     <div id="printable-receipt" className="w-full max-w-sm mx-auto bg-white text-black px-6 py-6 relative shadow-2xl">
-        {/* Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
-            <span className="text-[100px] font-black uppercase rotate-45">
-                KA
-            </span>
-        </div>
+        {/* Watermark removed */}
 
         {/* Header */}
         <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4 relative z-10">
-            <h1 className="text-2xl font-extrabold tracking-tight">{settings?.restaurantName || 'KAGZSO'}</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">{settings?.restaurantName || 'admin'}</h1>
             <p className="text-xs font-black text-black uppercase tracking-widest mt-0.5">Tax Invoice</p>
             <p className="text-[10px] text-gray-400 mt-1">{settings?.address || 'Restaurant Address'}</p>
             {settings?.gstNumber && <p className="text-[10px] text-gray-400">GSTIN: {settings.gstNumber}</p>}
@@ -165,7 +163,7 @@ const Receipt = ({ order, formatPrice, settings }) => (
             </div>
             <div className="text-right">
                 <p><strong>Invoice:</strong> #INV-{order.orderNumber?.split('-')[1]}</p>
-                <p><strong>Order:</strong> {order.orderNumber}</p>
+                <p><strong>Order:</strong> {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</p>
             </div>
         </div>
 
@@ -199,17 +197,17 @@ const Receipt = ({ order, formatPrice, settings }) => (
                 <span className="font-bold">{formatPrice(order.totalAmount)}</span>
             </div>
             
-            {(order.sgst > 0) && (
+            {(order.sgst > 0 || settings?.sgst > 0) && (
                 <div className="flex justify-between text-[11px]">
-                    <span className="font-bold uppercase tracking-widest text-[9px] opacity-60">SGST (2.5%):</span>
-                    <span className="font-bold">{formatPrice(order.sgst)}</span>
+                    <span className="font-bold uppercase tracking-widest text-[9px] opacity-60">SGST ({settings?.sgst || 0}%):</span>
+                    <span className="font-bold">{formatPrice(order.sgst || (order.totalAmount * (settings?.sgst || 0) / 100))}</span>
                 </div>
             )}
             
-            {(order.cgst > 0) && (
+            {(order.cgst > 0 || settings?.cgst > 0) && (
                 <div className="flex justify-between text-[11px]">
-                    <span className="font-bold uppercase tracking-widest text-[9px] opacity-60">CGST (2.5%):</span>
-                    <span className="font-bold">{formatPrice(order.cgst)}</span>
+                    <span className="font-bold uppercase tracking-widest text-[9px] opacity-60">CGST ({settings?.cgst || 0}%):</span>
+                    <span className="font-bold">{formatPrice(order.cgst || (order.totalAmount * (settings?.cgst || 0) / 100))}</span>
                 </div>
             )}
 
@@ -251,7 +249,6 @@ const CashierDashboard = () => {
     const [showInvoice, setShowInvoice] = useState(false); // mobile panel toggle
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
-    const [showPrintConfirm, setShowPrintConfirm] = useState(false);
     const [filterType, setFilterType] = useState('all'); // 'all' | 'dine-in' | 'takeaway'
     const [cancelModal, setCancelModal] = useState({ isOpen: false, order: null });
     const [isCardView, setIsCardView] = useState(() => localStorage.getItem('cashierCardView') !== 'false');
@@ -261,7 +258,7 @@ const CashierDashboard = () => {
         const sidebar = document.querySelector('aside');
         return (sidebar && sidebar.offsetWidth > 120) ? 3 : 4;
     });
-    const { user, socket, formatPrice, settings } = useContext(AuthContext);
+    const { user, socket, formatPrice, formatOrderNumber, settings } = useContext(AuthContext);
     const location = useLocation();
     const navigate = useNavigate();
     const isHistoryMode = location.pathname.includes('/history');
@@ -281,28 +278,49 @@ const CashierDashboard = () => {
     /* ── Fetch Orders ────────────────────────────────────────────────── */
     const fetchOrders = useCallback(async () => {
         setLoading(true);
+        if (!navigator.onLine) {
+            const [cached, pending] = await Promise.all([getCachedOrders(), getPendingOrders()]);
+            const allOrders = [...(pending || []), ...(cached || [])];
+            if (isHistoryMode) {
+                setOrders(allOrders.filter(o => o.orderStatus === 'completed' || o.orderStatus === 'cancelled'));
+            } else {
+                setOrders(allOrders.filter(o => o.orderStatus === 'payment'));
+            }
+            setLoading(false);
+            return;
+        }
         try {
             const res = await api.get('/api/orders', {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
             const allOrders = res.data.orders || [];
             if (isHistoryMode) {
-                // Show completed/cancelled for History
                 setOrders(allOrders.filter(o => o.orderStatus === 'completed' || o.orderStatus === 'cancelled'));
             } else {
-                // Show orders in Payment stage (per requirements)
                 setOrders(allOrders.filter(o => o.orderStatus === 'payment'));
             }
         } catch (err) {
             console.error('Error fetching orders', err);
+            const cached = await getCachedOrders();
+            const allOrders = cached || [];
+            if (isHistoryMode) {
+                setOrders(allOrders.filter(o => o.orderStatus === 'completed' || o.orderStatus === 'cancelled'));
+            } else {
+                setOrders(allOrders.filter(o => o.orderStatus === 'payment'));
+            }
         } finally {
             setLoading(false);
         }
     }, [user, isHistoryMode]);
     const filteredOrders = useMemo(() => {
         if (!Array.isArray(orders)) return [];
-        return orders.filter(o => filterType === 'all' || o.orderType === filterType);
-    }, [orders, filterType]);
+        return orders
+            .filter(o => 
+                (settings?.takeawayEnabled !== false || o.orderType !== 'takeaway') &&
+                (settings?.dineInEnabled !== false || o.orderType !== 'dine-in')
+            )
+            .filter(o => filterType === 'all' || o.orderType === filterType);
+    }, [orders, filterType, settings?.takeawayEnabled, settings?.dineInEnabled]);
 
     // ── Pre-calculate counts for filters ───
     const counts = useMemo(() => {
@@ -331,8 +349,46 @@ const CashierDashboard = () => {
 
         if (socket) {
             // Real-time updates: no polling needed
+            const playNotificationSound = () => {
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.volume = 0.5;
+                    audio.loop = true;
+                    audio.play().catch(e => console.log('Audio play blocked. Click anywhere to enable sounds.', e));
+
+                    // Stop after 5 seconds
+                    setTimeout(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                    }, 5000);
+                } catch (err) {
+                    console.error('Error playing sound:', err);
+                }
+            };
+
+            const announcePaymentReady = (order, callback) => {
+                const isDineIn = order.orderType === 'dine-in';
+                const idLabel = isDineIn 
+                    ? `table number ${order.tableId?.number || order.tableId || '?'}`
+                    : `token number ${order.tokenNumber || '?'}`;
+                const text = `Payment ready... ${idLabel}`;
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                if (callback) {
+                    utterance.onend = callback;
+                }
+                window.speechSynthesis.speak(utterance);
+            };
+
             const onNewOrder = (order) => {
                 const alreadyExists = prev => prev.find(o => o._id === order._id);
+                
+                // Voice first, then bell
+                if (order.orderStatus === 'payment') {
+                    announcePaymentReady(order, playNotificationSound);
+                }
+
                 if (isHistoryMode) {
                     if ((order.paymentStatus === 'paid' || order.orderStatus === 'cancelled')) {
                          setOrders(prev => alreadyExists(prev) ? prev : [order, ...prev]);
@@ -343,24 +399,27 @@ const CashierDashboard = () => {
             };
 
             const onOrderUpdate = (order) => {
+                // Determine if this order just entered the 'payment' phase
                 setOrders(prev => {
                     const exists = prev.find(o => o._id === order._id);
+                    const becomesPayment = order.orderStatus === 'payment' && !exists;
+                    
+                    if (becomesPayment) {
+                        announcePaymentReady(order, playNotificationSound);
+                    }
+
                     if (isHistoryMode) {
-                        // In history, if it's now paid/cancelled, ensure it's in list.
                         if (order.paymentStatus === 'paid' || order.orderStatus === 'cancelled') {
                             return exists ? prev.map(o => o._id === order._id ? order : o) : [order, ...prev];
                         } else {
                             return prev.filter(o => o._id !== order._id);
                         }
                     } else {
-                        // In POS, only show orders that are in 'payment' stage.
-                        // If it's paid, cancelled, or still in another kitchen status, remove it from list.
+                        // POS Mode: Only track 'payment' status
                         if (order.orderStatus !== 'payment') {
                             return prev.filter(o => o._id !== order._id);
                         }
-                        // Update existing order (or add if it just reached payment status)
-                        if (exists) return prev.map(o => o._id === order._id ? order : o);
-                        return [order, ...prev];
+                        return exists ? prev.map(o => o._id === order._id ? order : o) : [order, ...prev];
                     }
                 });
                 // Keep selected order in sync or deselect if closed
@@ -375,17 +434,21 @@ const CashierDashboard = () => {
             socket.on('order-updated', onOrderUpdate);
             socket.on('order-completed', onOrderUpdate);
             socket.on('orderCancelled', onOrderUpdate);
+            socket.on('itemUpdated', onOrderUpdate);
+            socket.on('productUpdated', onOrderUpdate); // Add this for sync
 
             return () => {
                 socket.off('new-order', onNewOrder);
                 socket.off('order-updated', onOrderUpdate);
                 socket.off('order-completed', onOrderUpdate);
                 socket.off('orderCancelled', onOrderUpdate);
+                socket.off('itemUpdated', onOrderUpdate);
+                socket.off('productUpdated', onOrderUpdate);
             };
         }
         window.addEventListener('pos-refresh', fetchOrders);
         return () => window.removeEventListener('pos-refresh', fetchOrders);
-    }, [user, socket, fetchOrders]);
+    }, [user, socket, fetchOrders, isHistoryMode]);
 
     /* ── Select Order ────────────────────────────────────────────────── */
     const handleSelect = (order) => {
@@ -481,6 +544,14 @@ const CashierDashboard = () => {
                         <div className="bg-orange-500/10 border border-orange-500/20 text-orange-500 px-2 xs:px-2.5 h-8 xs:h-9 flex items-center justify-center rounded-lg xs:rounded-xl text-[9px] xs:text-[10px] font-black transition-all">
                             {(orders || []).filter(o => filterType === 'all' || o.orderType === filterType).length}
                         </div>
+                        {/* Kitchen View Shortcut */}
+                        <button
+                            onClick={() => navigate('/kitchen')}
+                            title="Kitchen View"
+                            className="w-8 h-8 xs:w-9 xs:h-9 flex items-center justify-center rounded-lg xs:rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-500 transition-all hover:bg-orange-500 hover:text-white active:scale-95 shadow-sm"
+                        >
+                            <ChefHat size={14} xs:size={16} strokeWidth={2.5} />
+                        </button>
 
                          <button
                             onClick={() => { const next = !isCardView; setIsCardView(next); localStorage.setItem('cashierCardView', next); }}
@@ -617,17 +688,9 @@ const CashierDashboard = () => {
                                             </p>
                                         </div>
                                         <div className="flex gap-2 flex-wrap">
-                                            {selectedOrder.orderStatus !== 'cancelled' && selectedOrder.paymentStatus !== 'paid' && (
-                                                <button
-                                                    onClick={() => setCancelModal({ isOpen: true, order: selectedOrder })}
-                                                    className="flex items-center justify-center w-11 h-11 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-500/20 active:scale-95"
-                                                    title="Cancel Order"
-                                                >
-                                                    <XCircle size={20} strokeWidth={2.5} />
-                                                </button>
-                                            )}
+
                                             <button
-                                                onClick={() => setShowPrintConfirm(true)}
+                                                onClick={() => printBill(selectedOrder, formatPrice, settings)}
                                                 className="flex items-center gap-2 px-4 md:px-5 py-3 bg-[var(--theme-bg-hover)] hover:bg-[var(--theme-border)] text-[var(--theme-text-main)] rounded-xl font-semibold text-sm transition-colors min-h-[44px] border border-[var(--theme-border)]"
                                             >
                                                 <Printer size={17} />
@@ -689,37 +752,7 @@ const CashierDashboard = () => {
                     </div>
                 </div>
 
-                {/* ── TOP POPUP: Print Confirmation (iOS Style) ── */}
-                {showPrintConfirm && selectedOrder && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-scale-in">
-                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[4px]" onClick={() => setShowPrintConfirm(false)} />
-                        <div className="relative bg-white rounded-[1.3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col w-full max-w-[260px]">
-                            {/* Content Block */}
-                            <div className="p-5 flex flex-col items-center text-center gap-1.5 text-black">
-                                <h4 className="text-[17px] font-semibold tracking-tight leading-tight">Print Bill?</h4>
-                                <p className="text-[13px] text-gray-600 leading-tight">
-                                    Generate invoice for {selectedOrder.orderNumber}?
-                                </p>
-                            </div>
-                            
-                            {/* Buttons Block (iOS Style) */}
-                            <div className="grid grid-cols-2 border-t border-gray-200">
-                                <button 
-                                    onClick={() => setShowPrintConfirm(false)}
-                                    className="h-11 flex items-center justify-center text-[17px] text-[#007AFF] font-normal hover:bg-gray-50 active:bg-gray-100 transition-colors border-r border-gray-200"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    onClick={() => { printBill(selectedOrder, formatPrice, settings); setShowPrintConfirm(false); }}
-                                    className="h-11 flex items-center justify-center text-[17px] text-[#FF3B30] font-semibold hover:bg-gray-50 active:bg-gray-100 transition-colors"
-                                >
-                                    Print
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+
             </div>
 
             {/* ── Payment Modal ────────────────────────────────── */}

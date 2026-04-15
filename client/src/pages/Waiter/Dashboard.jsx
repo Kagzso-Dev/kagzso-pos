@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api';
+import { queueAction } from '../../utils/syncEngine';
 import { Utensils, Package, Grid, List, ShoppingBag, Clock, History, WifiOff, ChevronRight, ChevronLeft, RefreshCw, X, Armchair, LogOut, Grid2X2 } from 'lucide-react';
 import TableGrid from '../../components/TableGrid';
 import CancelOrderModal from '../../components/CancelOrderModal';
@@ -39,26 +40,29 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
     const elapsed = useElapsed(order.createdAt);
     const urgency = (Date.now() - new Date(order.createdAt)) > 600000;
     const isReady = order.orderStatus?.toLowerCase() === 'ready';
+    const isPaid = order.paymentStatus === 'paid';
 
-    const bgColor = 
-        order.orderStatus === 'pending' ? 'bg-orange-500/10 border-orange-500/30' :
-        order.orderStatus === 'accepted' ? 'bg-blue-500/10 border-blue-500/30' :
-        order.orderStatus === 'preparing' ? 'bg-indigo-500/10 border-indigo-500/30' :
-        order.orderStatus === 'ready' ? 'bg-emerald-500/10 border-emerald-500/40' :
-        order.orderStatus === 'readyToServe' ? 'bg-blue-500/10 border-blue-500/30' :
-        order.orderStatus === 'payment' ? 'bg-red-500/10 border-red-500/30' :
-        'bg-[var(--theme-bg-dark)] border-[var(--theme-border)]';
+    const bgColor =
+        order.paymentStatus === 'paid' ? 'bg-red-500/10 border-red-500/30' :
+            order.orderStatus === 'pending' ? 'bg-orange-500/10 border-orange-500/30' :
+                order.orderStatus === 'accepted' ? 'bg-blue-500/10 border-blue-500/30' :
+                    order.orderStatus === 'preparing' ? 'bg-indigo-500/10 border-indigo-500/30' :
+                        order.orderStatus === 'ready' ? 'bg-emerald-500/10 border-emerald-500/40' :
+                            order.orderStatus === 'readyToServe' ? 'bg-blue-500/10 border-blue-500/30' :
+                                order.orderStatus === 'payment' ? 'bg-red-500/10 border-red-500/30' :
+                                    'bg-[var(--theme-bg-dark)] border-[var(--theme-border)]';
 
     const borderAccent =
-        order.orderStatus === 'pending' ? 'border-l-orange-500' :
-        order.orderStatus === 'accepted' ? 'border-l-blue-500' :
-        order.orderStatus === 'preparing' ? 'border-l-indigo-500' :
-        order.orderStatus === 'ready' ? 'border-l-emerald-500' :
-        order.orderStatus === 'readyToServe' ? 'border-l-blue-500' :
-        order.orderStatus === 'payment' ? 'border-l-red-500' :
-        'border-l-[var(--theme-text-muted)]';
+        order.paymentStatus === 'paid' ? 'border-l-red-500' :
+            order.orderStatus === 'pending' ? 'border-l-orange-500' :
+                order.orderStatus === 'accepted' ? 'border-l-blue-500' :
+                    order.orderStatus === 'preparing' ? 'border-l-indigo-500' :
+                        order.orderStatus === 'ready' ? 'border-l-emerald-500' :
+                            order.orderStatus === 'readyToServe' ? 'border-l-blue-500' :
+                                order.orderStatus === 'payment' ? 'border-l-red-500' :
+                                    'border-l-[var(--theme-text-muted)]';
 
-    const visibleItems = order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED') || [];
+    const visibleItems = order.items || [];
 
     return (
         <div className={`
@@ -70,7 +74,7 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
             <div className="px-2 pt-2.5 pb-2 border-b border-black/[0.04]">
                 <div className="flex items-center justify-between gap-1 mb-1">
                     <h3 className="text-[13px] font-black text-[var(--theme-text-main)] tracking-tight leading-none truncate pr-1">
-                        {String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                        {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                     </h3>
                     <StatusBadge status={order.orderStatus} items={order.items || []} size="xs" />
                 </div>
@@ -80,11 +84,11 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-white/60 border border-black/5 rounded-md text-[9px] font-black text-gray-700 shadow-sm truncate max-w-[50%]">
                             <Utensils size={8} className="text-orange-500 shrink-0" />
                             {order.orderType === 'dine-in'
-                                ? `T${order.tableId?.number || order.tableId || '?'}`
-                                : `TK${order.tokenNumber || '?'}`}
+                                ? `T ${order.tableId?.number || order.tableId || '?'}`
+                                : `TK ${order.tokenNumber || '?'}`}
                         </span>
                         <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold shrink-0 ${urgency ? 'text-red-600 bg-red-100 px-1 py-0.5 rounded-md' : 'text-gray-400'}`}>
-                            <Clock size={8} />{elapsed.replace(' ', '')}
+                            <Clock size={8} />{elapsed}
                         </span>
                     </div>
                 </div>
@@ -92,14 +96,19 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
 
             {/* ── Items ── */}
             <div className="flex-1 px-2 py-2 space-y-1 min-h-[60px] max-h-[120px] overflow-y-auto custom-scrollbar">
-                {visibleItems.map((item, i) => (
-                    <div key={i} className="flex items-start gap-1.5">
-                        <div className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center text-[9px] font-black bg-white/5 text-[var(--theme-text-muted)]">
-                            {item.quantity}
+                {visibleItems.map((item, i) => {
+                    const isCancelled = item.status?.toUpperCase() === 'CANCELLED';
+                    return (
+                        <div key={i} className="flex items-start gap-1.5">
+                            <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center text-[9px] font-black ${isCancelled ? 'bg-red-500/10 text-red-500' : 'bg-white/5 text-[var(--theme-text-muted)]'}`}>
+                                {item.quantity}
+                            </div>
+                            <span className={`flex-1 text-[11px] font-bold leading-tight line-clamp-2 ${isCancelled ? 'text-red-500 line-through' : 'text-[var(--theme-text-main)]'}`}>
+                                {item.name}{item.variant ? ` (${item.variant.name})` : ''}
+                            </span>
                         </div>
-                        <span className="flex-1 text-[11px] font-bold text-[var(--theme-text-main)] leading-tight line-clamp-2">{item.name}{item.variant ? ` (${item.variant.name})` : ''}</span>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* ── Footer ── */}
@@ -120,21 +129,24 @@ const WaiterBoxCard = memo(({ order, formatPrice }) => {
 /* ── Order Card (List box style) ─────────────────────────────────────────── */
 const OrderCard = memo(({ order, formatPrice }) => {
     const isReady = order.orderStatus?.toLowerCase() === 'ready';
+    const isPaid = order.paymentStatus === 'paid';
     const borderColor =
-        order.orderStatus === 'pending' ? 'border-l-orange-500' :
-            order.orderStatus === 'accepted' ? 'border-l-blue-500' :
-                order.orderStatus === 'preparing' ? 'border-l-indigo-500' :
-                    order.orderStatus === 'readyToServe' ? 'border-l-blue-500' :
-                    order.orderStatus === 'payment' ? 'border-l-red-500' :
-                        'border-l-red-500';
+        order.paymentStatus === 'paid' ? 'border-l-red-500' :
+            order.orderStatus === 'pending' ? 'border-l-orange-500' :
+                order.orderStatus === 'accepted' ? 'border-l-blue-500' :
+                    order.orderStatus === 'preparing' ? 'border-l-indigo-500' :
+                        order.orderStatus === 'readyToServe' ? 'border-l-blue-500' :
+                            order.orderStatus === 'payment' ? 'border-l-red-500' :
+                                'border-l-red-500';
     const bgColor =
-        order.orderStatus === 'pending' ? 'bg-orange-500/5 border-orange-500/30' :
-        order.orderStatus === 'accepted' ? 'bg-blue-500/5 border-blue-500/30' :
-        order.orderStatus === 'preparing' ? 'bg-indigo-500/5 border-indigo-500/30' :
-        order.orderStatus === 'ready' ? 'bg-emerald-500/5 border-emerald-500/40' :
-        order.orderStatus === 'readyToServe' ? 'bg-blue-500/5 border-blue-500/30' :
-        order.orderStatus === 'payment' ? 'bg-red-500/5 border-red-500/30' :
-        'bg-[var(--theme-bg-card)]';
+        order.paymentStatus === 'paid' ? 'bg-red-500/5 border-red-500/30' :
+            order.orderStatus === 'pending' ? 'bg-orange-500/5 border-orange-500/30' :
+                order.orderStatus === 'accepted' ? 'bg-blue-500/5 border-blue-500/30' :
+                    order.orderStatus === 'preparing' ? 'bg-indigo-500/5 border-indigo-500/30' :
+                        order.orderStatus === 'ready' ? 'bg-emerald-500/5 border-emerald-500/40' :
+                            order.orderStatus === 'readyToServe' ? 'bg-blue-500/5 border-blue-500/30' :
+                                order.orderStatus === 'payment' ? 'bg-red-500/5 border-red-500/30' :
+                                    'bg-[var(--theme-bg-card)]';
 
     return (
         <div className={`
@@ -144,7 +156,7 @@ const OrderCard = memo(({ order, formatPrice }) => {
         `}>
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-black text-[var(--theme-text-main)] tracking-tight">{order.orderNumber}</span>
+                    <span className="text-sm font-black text-[var(--theme-text-main)] tracking-tight">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-white/60 dark:bg-white/10 border border-[var(--theme-border)] text-[10px] font-black text-[var(--theme-text-main)] whitespace-nowrap shadow-sm">
                         {order.orderType === 'dine-in'
                             ? `Table ${order.tableId?.number || order.tableId || '?'}`
@@ -171,14 +183,14 @@ const OrderCard = memo(({ order, formatPrice }) => {
 
 /* ── Production Token Card ───────────────────────────────────────────────── */
 const STATUS_META = {
-    pending:   { bar: 'bg-amber-500',   card: 'bg-amber-50   border-amber-200',   num: 'text-amber-600',   badge: 'bg-amber-100   text-amber-700   border-amber-300',   glow: 'shadow-amber-200' },
-    accepted:  { bar: 'bg-blue-500',    card: 'bg-blue-50    border-blue-200',    num: 'text-blue-600',    badge: 'bg-blue-100    text-blue-700    border-blue-300',    glow: 'shadow-blue-200' },
-    preparing: { bar: 'bg-violet-500',  card: 'bg-violet-50  border-violet-200',  num: 'text-violet-600',  badge: 'bg-violet-100  text-violet-700  border-violet-300',  glow: 'shadow-violet-200' },
-    ready:         { bar: 'bg-emerald-500', card: 'bg-emerald-50 border-emerald-300', num: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700 border-emerald-400', glow: 'shadow-emerald-300' },
-    readytoserve:  { bar: 'bg-blue-500',    card: 'bg-blue-50    border-blue-200',    num: 'text-blue-600',    badge: 'bg-blue-100    text-blue-700    border-blue-300',    glow: 'shadow-blue-200' },
-    payment:       { bar: 'bg-red-500',  card: 'bg-red-50  border-red-200',  num: 'text-red-700',  badge: 'bg-red-100  text-red-800  border-red-300',  glow: 'shadow-red-200' },
-    completed:     { bar: 'bg-gray-800',    card: 'bg-gray-50    border-gray-300',    num: 'text-gray-900',    badge: 'bg-gray-200    text-gray-800    border-gray-400',    glow: 'shadow-gray-200' },
-    cancelled:     { bar: 'bg-rose-500',    card: 'bg-rose-50    border-rose-200',    num: 'text-rose-600',    badge: 'bg-rose-100    text-rose-700    border-rose-300',    glow: 'shadow-rose-200' },
+    pending: { bar: 'bg-amber-500', card: 'bg-amber-50   border-amber-200', num: 'text-amber-600', badge: 'bg-amber-100   text-amber-700   border-amber-300', glow: 'shadow-amber-200' },
+    accepted: { bar: 'bg-blue-500', card: 'bg-blue-50    border-blue-200', num: 'text-blue-600', badge: 'bg-blue-100    text-blue-700    border-blue-300', glow: 'shadow-blue-200' },
+    preparing: { bar: 'bg-violet-500', card: 'bg-violet-50  border-violet-200', num: 'text-violet-600', badge: 'bg-violet-100  text-violet-700  border-violet-300', glow: 'shadow-violet-200' },
+    ready: { bar: 'bg-emerald-500', card: 'bg-emerald-50 border-emerald-300', num: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700 border-emerald-400', glow: 'shadow-emerald-300' },
+    readytoserve: { bar: 'bg-blue-500', card: 'bg-blue-50    border-blue-200', num: 'text-blue-600', badge: 'bg-blue-100    text-blue-700    border-blue-300', glow: 'shadow-blue-200' },
+    payment: { bar: 'bg-red-500', card: 'bg-red-50  border-red-200', num: 'text-red-700', badge: 'bg-red-100  text-red-800  border-red-300', glow: 'shadow-red-200' },
+    completed: { bar: 'bg-gray-800', card: 'bg-gray-50    border-gray-300', num: 'text-gray-900', badge: 'bg-gray-200    text-gray-800    border-gray-400', glow: 'shadow-gray-200' },
+    cancelled: { bar: 'bg-rose-500', card: 'bg-rose-50    border-rose-200', num: 'text-rose-600', badge: 'bg-rose-100    text-rose-700    border-rose-300', glow: 'shadow-rose-200' },
 };
 
 const TokenSquare = memo(({ order, onClick, isSelected }) => {
@@ -243,9 +255,9 @@ const TokenSquare = memo(({ order, onClick, isSelected }) => {
                 </div>
                 <div className="flex flex-col items-center py-1.5">
                     <span className="text-[10px] font-black text-black tracking-tight leading-none">
-                        #{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
+                        {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                     </span>
-                    <span className="text-[6px] font-black text-black uppercase tracking-widest mt-0.5">ORDER</span>
+                    <span className="text-[6px] font-black text-black uppercase tracking-widest mt-0.5">{order.orderType === 'dine-in' ? 'DINE IN' : 'TAKEAWAY'}</span>
                 </div>
             </div>
 
@@ -291,8 +303,8 @@ const WaiterDashboard = () => {
     const [, setTables] = useState([]);
     const location = useLocation();
     const activeTab = location.pathname.includes('/history') ? 'history' : 'active';
-    const [statusFilter, setStatusFilter] = useState(null); 
-    const [filterType, setFilterType] = useState('all'); 
+    const [statusFilter, setStatusFilter] = useState(null);
+    const [filterType, setFilterType] = useState('all');
     const [showTables, setShowTables] = useState(false);
     const [showCounters, setShowCounters] = useState(false); // Default Off per user request
     const [loading, setLoading] = useState(true);
@@ -301,7 +313,7 @@ const WaiterDashboard = () => {
     const [cancelModal, setCancelModal] = useState({ isOpen: false, order: null, item: null });
     const [refreshing, setRefreshing] = useState(false);
     const [isProductionMode, setIsProductionMode] = useState(false);
-    const { user, socket, formatPrice, settings } = useContext(AuthContext);
+    const { user, socket, formatPrice, formatOrderNumber, settings } = useContext(AuthContext);
 
     useEffect(() => {
         const local = localStorage.getItem('isProductionMode');
@@ -341,9 +353,53 @@ const WaiterDashboard = () => {
     useEffect(() => {
         if (user) fetchOrders();
         if (socket) {
-            const onNew = (o) => setOrders(p => { if (p.find(x => x._id === o._id)) return p; return [o, ...p]; });
+            const playNotificationSound = () => {
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.volume = 0.5;
+                    audio.loop = true;
+                    audio.play().catch(e => console.log('Audio play blocked. Interact with the page to enable sounds.', e));
+
+                    // Stop after 5 seconds
+                    setTimeout(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                    }, 5000);
+                } catch (err) {
+                    console.error('Error playing sound:', err);
+                }
+            };
+
+            const announceOrderReady = (order) => {
+                if (order.orderStatus === 'ready' && order.orderType === 'dine-in') {
+                    const tableNumber = order.tableId?.number || order.tableId || '?';
+                    const text = `Ready order, Dine In table number ${tableNumber}`;
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1;
+                    window.speechSynthesis.speak(utterance);
+                }
+            };
+
+            const onNew = (o) => setOrders(p => { 
+                if (p.find(x => x._id === o._id)) return p; 
+                if (o.orderStatus === 'ready') {
+                    playNotificationSound();
+                    announceOrderReady(o);
+                }
+                return [o, ...p]; 
+            });
+
             const onUpdate = (o) => {
-                setOrders(p => { const exists = p.find(x => x._id === o._id); return exists ? p.map(x => x._id === o._id ? o : x) : [o, ...p]; });
+                setOrders(p => { 
+                    const existing = p.find(x => x._id === o._id); 
+                    // Voice announcement if order becomes READY
+                    if (o.orderStatus === 'ready' && (!existing || existing.orderStatus !== 'ready')) {
+                        playNotificationSound();
+                        announceOrderReady(o);
+                    }
+                    return existing ? p.map(x => x._id === o._id ? o : x) : [o, ...p]; 
+                });
                 if (selectedOrder?._id === o._id) {
                     if (o.paymentStatus === 'paid' || o.orderStatus === 'cancelled') setSelectedOrder(null);
                     else setSelectedOrder(o);
@@ -365,6 +421,15 @@ const WaiterDashboard = () => {
         window.addEventListener('pos-refresh', fetchOrders);
         return () => window.removeEventListener('pos-refresh', fetchOrders);
     }, [user, socket, fetchOrders, selectedOrder]);
+
+    // Auto-refresh every 10 seconds to keep the dashboard in sync
+    useEffect(() => {
+        if (!user) return;
+        const interval = setInterval(() => {
+            fetchOrders();
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [user, fetchOrders]);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -391,15 +456,21 @@ const WaiterDashboard = () => {
             );
         } catch (err) { alert(err.response?.data?.message || "Action failed"); }
     };
-    
+
     const handleAddItems = async (orderId, items) => {
         try {
-            await api.post(`/api/orders/${orderId}/add-items`, 
-                { items }, 
+            await api.post(`/api/orders/${orderId}/add-items`,
+                { items },
                 { headers: { Authorization: `Bearer ${user.token}` } }
             );
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to add items');
+            console.log('[Dashboard] Add items failed, queuing:', err.message);
+            await queueAction({
+                type: 'add-items',
+                orderId,
+                items,
+            });
+            alert('Saved offline. Will sync when online.');
         }
     };
 
@@ -416,8 +487,8 @@ const WaiterDashboard = () => {
     };
 
     const filteredOrders = (activeTab === 'active' ? activeOrders : historyOrders)
-        .filter(o => settings?.takeawayEnabled !== false || o.orderType !== 'takeaway')
-        .filter(o => settings?.dineInEnabled !== false || o.orderType !== 'dine-in')
+        .filter(o => (settings?.takeawayEnabled !== false && settings?.takeawayEnabled !== 0) || o.orderType !== 'takeaway')
+        .filter(o => (settings?.dineInEnabled !== false && settings?.dineInEnabled !== 0) || o.orderType !== 'dine-in')
         .filter(o => filterType === 'all' || o.orderType === filterType)
         .filter(o => {
             if (activeTab !== 'active') return true;
@@ -427,7 +498,7 @@ const WaiterDashboard = () => {
 
     const readyOrders = filteredOrders.filter(o => o.orderStatus === 'ready');
     const processOrders = filteredOrders.filter(o => o.orderStatus !== 'ready');
-    const displayOrders = statusFilter 
+    const displayOrders = statusFilter
         ? (statusFilter === 'ready' ? readyOrders : processOrders)
         : filteredOrders;
 
@@ -462,11 +533,11 @@ const WaiterDashboard = () => {
                 <div className="flex items-center justify-between w-full animate-fade-in px-1 gap-2">
                     {/* Left side: Filters (Relocated from Row 2) */}
                     <div className="hidden sm:flex items-center flex-1 max-w-full overflow-hidden">
-                        <div 
+                        <div
                             className="flex items-center gap-1 p-1 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--theme-border)] shadow-inner overflow-x-auto no-scrollbar scroll-smooth w-fit max-w-full"
                             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                         >
-                             {['all', 'dine-in', 'takeaway']
+                            {['all', 'dine-in', 'takeaway']
                                 .filter(t => t !== 'takeaway' || settings?.takeawayEnabled !== false)
                                 .filter(t => t !== 'dine-in' || settings?.dineInEnabled !== false)
                                 .map(t => (
@@ -476,11 +547,10 @@ const WaiterDashboard = () => {
                                             setFilterType(t);
                                             e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
                                         }}
-                                        className={`flex-shrink-0 px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] transition-all duration-300 whitespace-nowrap active:scale-95 ${
-                                            filterType === t 
-                                                ? 'bg-orange-600 text-white shadow-[0_4px_12px_rgba(234,88,12,0.3)] scale-[1.02]' 
+                                        className={`flex-shrink-0 px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] transition-all duration-300 whitespace-nowrap active:scale-95 ${filterType === t
+                                                ? 'bg-orange-600 text-white shadow-[0_4px_12px_rgba(234,88,12,0.3)] scale-[1.02]'
                                                 : 'text-[var(--theme-text-muted)] hover:text-orange-500 hover:bg-orange-500/5'
-                                        }`}
+                                            }`}
                                     >
                                         {t === 'all' ? 'All' : t === 'dine-in' ? 'Dine' : 'Take'}
                                     </button>
@@ -492,12 +562,12 @@ const WaiterDashboard = () => {
                     <div className="flex items-center gap-2 ml-auto">
                         {/* Primary Order Actions (Relocated to Right) */}
                         <div className="hidden md:flex items-center gap-2 mr-2 border-r border-[var(--theme-border)] pr-2">
-                            {user?.role !== 'cashier' && settings?.dineInEnabled !== false && (
+                            {user?.role !== 'cashier' && settings?.dineInEnabled !== false && settings?.dineInEnabled !== 0 && (
                                 <button onClick={() => navigate('/dine-in')} className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl transition-all font-black text-[10px] uppercase tracking-widest shadow-lg shadow-orange-600/20 whitespace-nowrap min-h-[40px] active:scale-95">
                                     <Utensils size={14} strokeWidth={3} /> Dine In
                                 </button>
                             )}
-                            {user?.role !== 'cashier' && settings?.takeawayEnabled !== false && (
+                            {user?.role !== 'cashier' && settings?.takeawayEnabled !== false && settings?.takeawayEnabled !== 0 && (
                                 <button onClick={() => navigate('/take-away')} className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-600/20 whitespace-nowrap min-h-[40px] active:scale-95">
                                     <Package size={14} strokeWidth={3} /> Takeaway
                                 </button>
@@ -507,11 +577,10 @@ const WaiterDashboard = () => {
                         {/* Utility controls & Refresh */}
                         <div className="flex items-center gap-1.5 ml-auto">
                             <button onClick={() => setShowCounters(prev => !prev)} title={showCounters ? 'Collapse Stats' : 'Expand Stats'}
-                                className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-all active:scale-90 border-2 ${
-                                    showCounters 
-                                        ? 'bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/30' 
+                                className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-all active:scale-90 border-2 ${showCounters
+                                        ? 'bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/30'
                                         : 'bg-[var(--theme-bg-dark)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:border-orange-500'
-                                }`}>
+                                    }`}>
                                 <ChevronRight size={18} strokeWidth={3} className={`transition-transform duration-300 ${showCounters ? 'rotate-90' : ''}`} />
                             </button>
 
@@ -536,12 +605,12 @@ const WaiterDashboard = () => {
             {document.getElementById('topbar-portal-row2') && createPortal(
                 <div className="flex flex-col w-full gap-1.5 animate-fade-in px-1 pb-1 sm:hidden">
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                         {/* Filter Pill (Mobile) - Smaller */}
-                        <div 
+                        {/* Filter Pill (Mobile) - Smaller */}
+                        <div
                             className="flex items-center gap-1 p-0.5 bg-black/5 dark:bg-white/5 rounded-xl border border-[var(--theme-border)] shadow-inner overflow-x-auto no-scrollbar scroll-smooth w-fit max-w-[60%]"
                             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                         >
-                             {['all', 'dine', 'takeaway']
+                            {['all', 'dine', 'takeaway']
                                 .filter(t => t !== 'takeaway' || settings?.takeawayEnabled !== false)
                                 .filter(t => t !== 'dine' || settings?.dineInEnabled !== false)
                                 .map(t => (
@@ -551,37 +620,33 @@ const WaiterDashboard = () => {
                                             setFilterType(t);
                                             e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
                                         }}
-                                        className={`flex-shrink-0 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all duration-300 whitespace-nowrap active:scale-95 ${
-                                            filterType === t 
-                                                ? 'bg-orange-600 text-white shadow-sm' 
+                                        className={`flex-shrink-0 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all duration-300 whitespace-nowrap active:scale-95 ${filterType === t
+                                                ? 'bg-orange-600 text-white shadow-sm'
                                                 : 'text-[var(--theme-text-muted)] hover:text-orange-500'
-                                        }`}
+                                            }`}
                                     >
                                         {t === 'all' ? 'All' : t === 'dine' ? 'Dine' : 'Take'}
                                     </button>
                                 ))}
                         </div>
 
-                         <div className="flex items-center gap-1 ml-auto shrink-0">
+                        <div className="flex items-center gap-1 ml-auto shrink-0">
                             {settings?.tableMapEnabled !== false && (
                                 <button onClick={() => setShowTables(t => !t)} className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all active:scale-95 ${showTables ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-500' : 'bg-[var(--theme-bg-dark)] border-[var(--theme-border)] text-[var(--theme-text-muted)]'}`}>
                                     <Armchair size={15} strokeWidth={2.5} />
                                 </button>
                             )}
-                            <button onClick={() => navigate('/logout')} className="w-8 h-8 flex items-center justify-center rounded-lg border border-rose-500/30 bg-rose-500/5 text-rose-500 transition-all active:scale-95 font-bold">
-                                <LogOut size={14} strokeWidth={2.5} />
-                            </button>
                         </div>
                     </div>
 
                     {/* Compact Creation Buttons */}
                     <div className="flex items-center gap-2 py-1">
-                        {user?.role !== 'cashier' && settings?.dineInEnabled !== false && (
+                        {user?.role !== 'cashier' && settings?.dineInEnabled !== false && settings?.dineInEnabled !== 0 && (
                             <button onClick={() => navigate('/dine-in')} className="flex-1 flex items-center justify-center gap-2 h-10 bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider active:scale-95 shadow-md shadow-orange-600/10 transition-all">
                                 <Utensils size={14} strokeWidth={3} /> Dine In
                             </button>
                         )}
-                        {user?.role !== 'cashier' && settings?.takeawayEnabled !== false && (
+                        {user?.role !== 'cashier' && settings?.takeawayEnabled !== false && settings?.takeawayEnabled !== 0 && (
                             <button onClick={() => navigate('/take-away')} className="flex-1 flex items-center justify-center gap-2 h-10 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider active:scale-95 shadow-md shadow-blue-600/10 transition-all">
                                 <Package size={14} strokeWidth={3} /> Takeaway
                             </button>
@@ -597,10 +662,10 @@ const WaiterDashboard = () => {
                     <div className="bg-[var(--theme-bg-card)] border-b border-[var(--theme-border)] shadow-sm p-3">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {[
-                                { key: 'pending',   count: counts.pending,   color: 'orange',  label: 'NEW KOT' },
-                                { key: 'ready',     count: counts.ready,     color: 'emerald', label: 'READY'   },
+                                { key: 'pending', count: counts.pending, color: 'orange', label: 'NEW KOT' },
+                                { key: 'ready', count: counts.ready, color: 'emerald', label: 'READY' },
                                 { key: 'preparing', count: activeOrders.filter(o => o.orderStatus === 'preparing').length, color: 'blue', label: 'PREPARING' },
-                                { key: null,        count: activeOrders.length, color: 'orange', label: 'ALL ACTIVE', isClear: true }
+                                { key: null, count: activeOrders.length, color: 'orange', label: 'ALL ACTIVE', isClear: true }
                             ].map(({ key, count, color, label, isClear }, idx) => {
                                 const isActive = (statusFilter === key || (isClear && !statusFilter));
                                 return (
@@ -618,7 +683,7 @@ const WaiterDashboard = () => {
                                         <span className={`text-2xl font-black tabular-nums tracking-tighter transition-colors ${isActive ? 'text-orange-500' : 'text-[var(--theme-text-main)]'}`}>
                                             {count}
                                         </span>
-                                        
+
                                         <div className="flex items-center gap-1 mt-1">
                                             <div className={`flex items-center opacity-60 ${isActive ? 'text-orange-500' : 'text-[var(--theme-text-muted)]'}`}>
                                                 <ChevronRight size={10} strokeWidth={4} className="animate-chevron-r1" />
@@ -649,10 +714,10 @@ const WaiterDashboard = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             {[
-                                { key: 'pending',   count: counts.pending,   color: 'orange',  label: 'NEW KOT' },
-                                { key: 'ready',     count: counts.ready,     color: 'emerald', label: 'READY'   },
+                                { key: 'pending', count: counts.pending, color: 'orange', label: 'NEW KOT' },
+                                { key: 'ready', count: counts.ready, color: 'emerald', label: 'READY' },
                                 { key: 'preparing', count: activeOrders.filter(o => o.orderStatus === 'preparing').length, color: 'blue', label: 'PREPARING' },
-                                { key: null,        count: activeOrders.length, color: 'orange', label: 'ALL ACTIVE', isClear: true }
+                                { key: null, count: activeOrders.length, color: 'orange', label: 'ALL ACTIVE', isClear: true }
                             ].map(({ key, count, color, label, isClear }, idx) => {
                                 const isActive = (statusFilter === key || (isClear && !statusFilter));
                                 return (
@@ -703,12 +768,12 @@ const WaiterDashboard = () => {
                             </button>
                         </div>
                         <div className="overflow-y-auto p-4 sm:p-5 flex-1">
-                            <TableGrid 
-                                allowedStatuses={['available', 'occupied', 'reserved']} 
+                            <TableGrid
+                                allowedStatuses={['available', 'occupied', 'cleaning']}
                                 filterByAllowedStatuses={false}
-                                showCleanAction={true} 
-                                onReserve={handleReserveTable} 
-                                onCancelReservation={handleCancelReservation} 
+                                showCleanAction={true}
+                                onReserve={handleReserveTable}
+                                onCancelReservation={handleCancelReservation}
                             />
                         </div>
                     </div>
@@ -720,7 +785,7 @@ const WaiterDashboard = () => {
             <div className="flex gap-0 relative h-[calc(100vh-70px)] overflow-hidden">
 
                 {/* ── Left panel (Order Grid) ────────────────────────────────── */}
-                <div 
+                <div
                     className={`flex-1 kot-scroll transition-all duration-300 ${selectedOrder ? 'opacity-100' : 'opacity-100'}`}
                 >
                     {loading ? (
@@ -744,15 +809,14 @@ const WaiterDashboard = () => {
                             )}
                         </div>
                     ) : (
-                        <div className={`grid p-2 w-full mx-auto gap-3 transition-all duration-300 ${
-                            isProductionMode
-                                ? selectedOrder 
-                                    ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4' 
+                        <div className={`grid p-2 w-full mx-auto gap-3 transition-all duration-300 ${isProductionMode
+                                ? selectedOrder
+                                    ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
                                     : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8'
                                 : selectedOrder
                                     ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
                                     : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
-                        }`}>
+                            }`}>
                             {displayOrders.map(order => (
                                 isProductionMode
                                     ? <TokenSquare key={order._id} order={order} onClick={() => setSelectedOrder(order)} isSelected={selectedOrder?._id === order._id} />
@@ -773,7 +837,7 @@ const WaiterDashboard = () => {
 
                 {/* ── Right Panel (Details Panel) ── desktop only ────────────────── */}
                 {selectedOrder && (
-                    <div 
+                    <div
                         className="hidden md:flex flex-col flex-shrink-0 w-[400px] lg:w-[440px] xl:w-[480px] border-l border-[var(--theme-border)] bg-[var(--theme-bg-card)] animate-in slide-in-from-right duration-300 ease-out"
                     >
                         <OrderDetailsModal
@@ -813,13 +877,13 @@ const WaiterDashboard = () => {
                 document.body
             )}
 
-            <CancelOrderModal 
-                isOpen={cancelModal.isOpen} 
-                order={cancelModal.order} 
-                item={cancelModal.item} 
-                title={cancelModal.item ? "Cancel Item" : "Cancel Order"} 
-                onClose={() => setCancelModal({ isOpen: false, order: null, item: null })} 
-                onConfirm={handleCancelAction} 
+            <CancelOrderModal
+                isOpen={cancelModal.isOpen}
+                order={cancelModal.order}
+                item={cancelModal.item}
+                title={cancelModal.item ? "Cancel Item" : "Cancel Order"}
+                onClose={() => setCancelModal({ isOpen: false, order: null, item: null })}
+                onConfirm={handleCancelAction}
             />
         </div>
     );

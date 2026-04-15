@@ -9,7 +9,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 const { cacheMiddleware } = require('../utils/cache');
 
 // ── Public Routes ──────────────────────────────────────────────
-router.get('/', cacheMiddleware(3600, 'settings'), getSettings);
+router.get('/', cacheMiddleware(60, 'settings'), getSettings);
 
 // ── Protected Routes (Admin Only for most) ──────────────────────
 router.use(protect);

@@ -65,7 +65,7 @@ const CancelOrderModal = ({ order, item, isOpen, onClose, onConfirm, title = "Ca
                             </h3>
                             {item || order ? (
                                 <p className="inline-flex items-center text-[10px] font-black bg-red-500/10 px-3 py-1.5 rounded-full text-red-600 border border-red-500/20 uppercase tracking-widest">
-                                    Target: {item ? item.name : (String(order?.orderNumber).startsWith('ORD-') ? String(order?.orderNumber).replace('ORD-', '#') : `#${order?.orderNumber}`)}
+                                    Target: {item ? item.name : (order?.orderType === 'dine-in' ? 'DI' : 'TK') + '-' + (String(order?.orderNumber).startsWith('ORD-') ? String(order?.orderNumber).replace('ORD-', '') : order?.orderNumber)}
                                 </p>
                             ) : null}
                         </div>

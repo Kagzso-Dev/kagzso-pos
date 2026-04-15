@@ -49,12 +49,19 @@ const getSummary = async (req, res) => {
         }
 
         const [rows] = await mysql.query(
-            `SELECT SUM(final_amount) as totalRevenue, COUNT(*) as orderCount FROM orders ${where}`,
+            `SELECT 
+                SUM(final_amount) as totalRevenue, 
+                SUM(sgst) as totalSgst, 
+                SUM(cgst) as totalCgst, 
+                COUNT(*) as orderCount 
+             FROM orders ${where}`,
             params
         );
 
         const summary = rows[0];
         const totalRevenue = parseFloat(summary.totalRevenue || 0);
+        const totalSgst = parseFloat(summary.totalSgst || 0);
+        const totalCgst = parseFloat(summary.totalCgst || 0);
         const orderCount = parseInt(summary.orderCount || 0);
 
         // Payment Method breakdown
@@ -71,6 +78,8 @@ const getSummary = async (req, res) => {
 
         res.json({
             totalRevenue,
+            totalSgst,
+            totalCgst,
             orderCount,
             avgOrderValue: orderCount > 0 ? totalRevenue / orderCount : 0,
             paymentSummary

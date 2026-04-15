@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
+import { getCachedOrders, getPendingOrders } from '../../db/db';
 import { Search, Eye, ShoppingBag, Calendar, X, ChevronLeft, ChevronRight, XCircle } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import OrderDetailsModal from '../../components/OrderDetailsModal';
@@ -239,7 +240,7 @@ const AdminOrders = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [cancelModal, setCancelModal] = useState({ isOpen: false, order: null });
     const datePickerRef = useRef(null);
-    const { user, formatPrice, socket } = useContext(AuthContext);
+    const { user, formatPrice, socket, settings } = useContext(AuthContext);
     const location = useLocation();
 
     // ── External URL auto-sync (Open order from Search) ──────────────────────
@@ -257,15 +258,20 @@ const AdminOrders = () => {
     }, [location.search, orders]);
 
     const fetchOrders = useCallback(async () => {
+        if (!navigator.onLine) {
+            const [cached, pending] = await Promise.all([getCachedOrders(), getPendingOrders()]);
+            setOrders([...(pending || []), ...(cached || [])]);
+            return;
+        }
         try {
             const res = await api.get('/orders', {
-                params: {
-                    limit: 100
-                }
+                params: { limit: 100 }
             });
             setOrders(res.data.orders || []);
         } catch (error) {
             console.error("Error fetching orders", error);
+            const cached = await getCachedOrders();
+            setOrders(cached || []);
         }
     }, [user]);
 
@@ -309,10 +315,20 @@ const AdminOrders = () => {
         }
 
         if (searchQuery) {
-            temp = temp.filter(o =>
-                o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                o.customerInfo?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-            );
+            temp = temp.filter(o => {
+                const displayNum = `${o.orderType === 'dine-in' ? 'DI' : 'TK'}-${String(o.orderNumber).startsWith('ORD-') ? String(o.orderNumber).replace('ORD-', '') : o.orderNumber}`;
+                return displayNum.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    o.customerInfo?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+            });
+        }
+
+        // Global setting filter: Hide takeaway/dine-in from history if disabled
+        if (settings?.takeawayEnabled === false || settings?.takeawayEnabled === 0) {
+            temp = temp.filter(o => o.orderType !== 'takeaway');
+        }
+        if (settings?.dineInEnabled === false || settings?.dineInEnabled === 0) {
+            temp = temp.filter(o => o.orderType !== 'dine-in');
         }
 
         setFilteredOrders(temp);
@@ -344,7 +360,8 @@ const AdminOrders = () => {
     }, []);
 
     const handleProcessPayment = async (order) => {
-        if (!window.confirm(`Process payment of ${formatPrice(order.finalAmount)} for ${order.orderNumber}?`)) return;
+        const displayOrderNum = order.orderType === 'dine-in' ? 'DI' : 'TK' + '-' + (String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber);
+        if (!window.confirm(`Process payment of ${formatPrice(order.finalAmount)} for ${displayOrderNum}?`)) return;
 
         try {
             const res = await api.put(`/orders/${order._id}/payment`, {
@@ -505,7 +522,7 @@ const AdminOrders = () => {
                                         <td className="px-3 sm:px-6 py-3 sm:py-4">
                                             <div className="flex flex-col min-w-0">
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5 mb-1">
-                                                    <span className="font-black text-inherit text-[11px] sm:text-sm tracking-tight truncate">{order.orderNumber}</span>
+                                                    <span className="font-black text-inherit text-[11px] sm:text-sm tracking-tight truncate">{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</span>
                                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-black/5 text-[8px] font-black uppercase border border-current/10 w-fit">
                                                         {order.orderType === 'dine-in' ? `T${order.tableId?.number || order.tableId || '?'}` : `TK${order.tokenNumber || '?'}`}
                                                     </span>
@@ -572,6 +589,7 @@ const AdminOrders = () => {
             onProcessPayment={handleProcessPayment}
             onCancelOrder={(o) => setCancelModal({ isOpen: true, order: o })}
             userRole={user?.role}
+            settings={settings}
         />
 
         <CancelOrderModal

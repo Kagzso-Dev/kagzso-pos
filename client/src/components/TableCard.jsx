@@ -14,18 +14,6 @@ export const STATUS_CONFIG = {
         hoverBg: 'hover:border-emerald-400 hover:shadow-emerald-100',
         ring: 'ring-emerald-400/30',
     },
-    reserved: {
-        bg: 'bg-white',
-        border: 'border-amber-200',
-        dot: 'bg-amber-400',
-        text: 'text-amber-500',
-        label: 'Reserved',
-        icon: Lock,
-        chairColor: 'text-amber-500',
-        badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
-        hoverBg: 'hover:border-amber-400 hover:shadow-amber-100',
-        ring: 'ring-amber-400/30',
-    },
     occupied: {
         bg: 'bg-white',
         border: 'border-rose-200',
@@ -40,15 +28,15 @@ export const STATUS_CONFIG = {
     },
     cleaning: {
         bg: 'bg-white',
-        border: 'border-gray-200',
-        dot: 'bg-gray-400',
-        text: 'text-gray-500',
-        label: 'Cleaning',
+        border: 'border-slate-300',
+        dot: 'bg-slate-500',
+        text: 'text-slate-600',
+        label: 'Clean',
         icon: Clock,
-        chairColor: 'text-gray-400',
-        badgeBg: 'bg-gray-50 text-gray-600 border-gray-200',
-        hoverBg: 'hover:border-gray-400 hover:shadow-gray-100',
-        ring: 'ring-gray-400/30',
+        chairColor: 'text-slate-500',
+        badgeBg: 'bg-slate-50 text-slate-700 border-slate-200',
+        hoverBg: 'hover:border-slate-400 hover:shadow-slate-100',
+        ring: 'ring-slate-400/30',
     },
 };
 
@@ -64,10 +52,10 @@ const TableCard = ({ table, onClick, clickable = false, actions, variant = 'grid
                 onClick={clickable ? onClick : undefined}
                 onKeyDown={clickable ? (e) => e.key === 'Enter' && onClick?.() : undefined}
                 className={`relative flex items-center justify-between gap-4 px-4 py-3 rounded-xl border ${cfg.border} ${cfg.bg} transition-all duration-150 group
-                    ${clickable ? `cursor-pointer hover:shadow-md ${cfg.hoverBg}` : 'cursor-default'}`}
+                    ${clickable ? `cursor-pointer hover:shadow-md ${cfg.hoverBg}` : 'cursor-not-allowed opacity-60'}`}
             >
                 <div className="flex items-center gap-3">
-                    <span className={`w-2 h-2 rounded-full ${cfg.dot} ${table.status === 'reserved' ? 'animate-pulse' : ''}`} />
+                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                     <span className="text-sm font-black text-gray-800">{table.number}</span>
                     <span className={`flex items-center gap-1 text-xs font-bold ${cfg.chairColor}`}>
                         <Users size={13} /> {table.capacity}
@@ -94,7 +82,7 @@ const TableCard = ({ table, onClick, clickable = false, actions, variant = 'grid
                 relative flex flex-col items-center justify-center
                 w-full py-4 px-1 sm:max-w-[130px] rounded-[1.75rem] border-2 ${cfg.border} ${cfg.bg}
                 shadow-sm transition-all duration-300 group select-none
-                ${clickable ? `cursor-pointer hover:shadow-xl hover:-translate-y-1 active:scale-95 ${cfg.hoverBg}` : 'cursor-default'}
+                ${clickable ? `cursor-pointer hover:shadow-xl hover:-translate-y-1 active:scale-95 ${cfg.hoverBg}` : 'cursor-not-allowed opacity-60'}
             `}
         >
             {/* Table Label */}
@@ -119,10 +107,7 @@ const TableCard = ({ table, onClick, clickable = false, actions, variant = 'grid
             </div>
 
 
-            {/* Floating Status Dot (Reserved) */}
-            {table.status === 'reserved' && (
-                <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-amber-400 animate-ping opacity-75" />
-            )}
+
 
             {/* Actions (hover) */}
             {actions && (

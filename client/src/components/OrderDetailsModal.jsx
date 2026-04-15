@@ -64,6 +64,7 @@ const OrderDetailsModal = ({
     const isPaid = order?.paymentStatus === 'paid';
     const isCompleted = order?.orderStatus === 'completed';
     const isCancelled = order?.orderStatus === 'cancelled';
+    const isPaymentOngoing = order?.orderStatus === 'payment';
     const isReady = order?.orderStatus === 'ready' && 
                     !order?.isPartiallyReady && 
                     (order?.items || []).every(i => ['READY', 'CANCELLED'].includes(i.status?.toUpperCase()));
@@ -102,16 +103,6 @@ const OrderDetailsModal = ({
                     </div>
 
                     <div className="flex items-center gap-2.5">
-                        {(order?.items || []).some(item => item.isNewlyAdded) && (
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); printBill(order, formatPrice, settings, true, true); }}
-                                className="w-10 h-10 flex items-center justify-center rounded-2xl bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white transition-all duration-300 active:scale-95 border border-blue-500/20 group relative shadow-sm"
-                                title="Print New Items KOT"
-                            >
-                                <Printer size={16} strokeWidth={3} />
-                                <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[7px] font-black px-2 py-0.5 rounded-full border-2 border-[var(--theme-bg-card)] shadow-[0_2px_10px_rgba(37,99,235,0.3)]">NEW</span>
-                            </button>
-                        )}
                         <button 
                             onClick={(e) => { e.stopPropagation(); printBill(order, formatPrice, settings); }}
                             className="w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--theme-bg-dark)]/50 text-[var(--theme-text-muted)] hover:text-orange-500 hover:bg-orange-500/10 transition-all duration-300 active:scale-95 border border-[var(--theme-border)] group shadow-sm"
@@ -136,9 +127,11 @@ const OrderDetailsModal = ({
                         flex flex-col items-center justify-center 
                         min-w-[50px] xs:min-w-[65px] h-[50px] xs:h-[65px] 
                         rounded-2xl border-2 shadow-2xl transition-all duration-500 group relative overflow-hidden shrink-0
-                        ${order.orderType === 'dine-in' 
-                            ? 'bg-gradient-to-br from-orange-400/20 to-orange-600/10 border-orange-500/30 text-orange-600 shadow-orange-500/10' 
-                            : 'bg-gradient-to-br from-blue-400/20 to-blue-600/10 border-blue-500/30 text-blue-600 shadow-blue-500/10'}
+                        ${isPaid 
+                            ? 'bg-gradient-to-br from-red-500/20 to-red-700/10 border-red-500/30 text-red-600 shadow-red-500/10'
+                            : order.orderType === 'dine-in' 
+                                ? 'bg-gradient-to-br from-orange-400/20 to-orange-600/10 border-orange-500/30 text-orange-600 shadow-orange-500/10' 
+                                : 'bg-gradient-to-br from-blue-400/20 to-blue-600/10 border-blue-500/30 text-blue-600 shadow-blue-500/10'}
                     `}>
                         <div className="absolute inset-0 bg-white/5 group-hover:bg-transparent transition-colors duration-500" />
                         <span className="text-[22px] xs:text-[34px] font-black leading-none tracking-tighter z-10">
@@ -153,8 +146,8 @@ const OrderDetailsModal = ({
                     </div>
 
                     <div className="flex-1 flex flex-col gap-0.5 xs:gap-1 min-w-0">
-                        <h2 className="text-[18px] xs:text-[28px] font-black uppercase tracking-tighter text-[var(--theme-text-main)] truncate leading-none">
-                            {String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
+                        <h2 className={`text-[18px] xs:text-[28px] font-black uppercase tracking-tighter truncate leading-none ${isPaid ? 'text-red-700' : 'text-[var(--theme-text-main)]'}`}>
+                            {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                         </h2>
                         
                         <div className="flex items-center gap-1.5 xs:gap-2.5 flex-wrap mt-1">
@@ -165,7 +158,7 @@ const OrderDetailsModal = ({
                                     {order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED').length} Items
                                 </span>
                             </div>
-                            <span className={`px-2 xs:px-3 py-0.5 xs:py-1 rounded-lg xs:rounded-xl text-[9px] xs:text-[10px] font-black uppercase tracking-tight xs:tracking-wider border shadow-sm whitespace-nowrap ${isPaid ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-500 animate-pulse-subtle'}`}>
+                            <span className={`px-2 xs:px-3 py-0.5 xs:py-1 rounded-lg xs:rounded-xl text-[9px] xs:text-[10px] font-black uppercase tracking-tight xs:tracking-wider border shadow-sm whitespace-nowrap ${isPaid ? 'bg-red-600 text-white border-red-700' : 'bg-rose-500/10 border-rose-500/20 text-rose-500 animate-pulse-subtle'}`}>
                                 {isPaid ? '• Paid' : '• Unpaid'}
                             </span>
                             <div className="flex items-center gap-1.5 text-[var(--theme-text-muted)] ml-auto bg-[var(--theme-bg-dark)]/30 px-2 xs:px-3 py-0.5 xs:py-1 rounded-lg xs:rounded-xl border border-[var(--theme-border)]/50">
@@ -216,14 +209,20 @@ const OrderDetailsModal = ({
                                      icon = <Check size={28} strokeWidth={3} className="scale-75 xs:scale-100" />;
                                      colorClass = "bg-orange-600 border-orange-500 text-white shadow-[0_10px_25px_rgba(249,115,22,0.3)] hover:scale-105 active:scale-95";
                                      enabled = true;
+                                 } else if (order.orderStatus === 'payment') {
+                                     label = "Billed";
+                                     icon = <Check size={28} strokeWidth={3} className="scale-75 xs:scale-100 opacity-50" />;
+                                     colorClass = "bg-orange-500/20 border-orange-500/30 text-orange-500/50 cursor-default";
                                  }
                              } else if (userRole === 'cashier' || userRole === 'admin') {
                                  if (order.orderStatus === 'payment') {
-                                     label = "Done";
+                                     label = (userRole === 'admin' && !isPaid) ? "Billed" : "Done";
                                      nextStatus = "completed";
                                      icon = <CheckCircle size={28} strokeWidth={2.5} className="scale-75 xs:scale-100" />;
-                                     colorClass = "bg-emerald-600 border-emerald-500 text-white shadow-[0_10px_25px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95";
                                      enabled = isPaid; // Only allow completion if paid
+                                     colorClass = enabled 
+                                        ? "bg-emerald-600 border-emerald-500 text-white shadow-[0_10px_25px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95"
+                                        : "bg-gray-100 dark:bg-white/5 border-[var(--theme-border)] text-[var(--theme-text-muted)] opacity-40 cursor-not-allowed grayscale";
                                  }
                              }
 
@@ -290,10 +289,10 @@ const OrderDetailsModal = ({
                             <div className="flex flex-col w-full overflow-hidden">
                                 <span className="text-[10px] xs:text-[12px] font-black uppercase tracking-wider xs:tracking-[0.3em] text-orange-500 leading-none mb-1 xs:mb-2 whitespace-nowrap">Grand Total</span>
                                 <div className="flex items-baseline gap-1 xs:gap-1.5 flex-wrap">
+                                    <span className="text-xs xs:text-base font-black text-orange-500 opacity-60 leading-none">{formatPrice(order.finalAmount).replace(/[\d.,\s]/g, '')}</span>
                                     <span className="text-[24px] xs:text-[36px] font-black tracking-tighter leading-none tabular-nums text-[var(--theme-text-main)]">
                                         {formatPrice(order.finalAmount).replace(/[^\d.,]/g, '')}
                                     </span>
-                                    <span className="text-xs xs:text-base font-black text-orange-500 opacity-60 leading-none">{formatPrice(order.finalAmount).replace(/[\d.,\s]/g, '')}</span>
                                 </div>
                             </div>
                         </div>
@@ -307,16 +306,8 @@ const OrderDetailsModal = ({
                             <span className="text-[9px] font-bold text-orange-500 opacity-70 uppercase tracking-widest">{order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED').length} Total</span>
                         </div>
                         <div className="flex items-center gap-1.5 xs:gap-2">
-                            {!isCancelled && !isPaid && onCancelOrder && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onCancelOrder(order); }}
-                                    className="px-2.5 xs:px-4 py-1.5 xs:py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white text-[9px] xs:text-[10px] font-black rounded-lg xs:rounded-xl border border-red-500/20 shadow-sm flex items-center gap-1.5 uppercase transition-all active:scale-95"
-                                    title="Cancel Order"
-                                >
-                                    <X size={12} strokeWidth={3} /> <span className="hidden xs:inline">Cancel Order</span><span className="xs:hidden">Cancel</span>
-                                </button>
-                            )}
-                            {userRole === 'waiter' && !isCancelled && !isPaid && (
+                            {/* Cancel Order button hidden per request */}
+                            {userRole === 'waiter' && !isCancelled && !isPaid && !isPaymentOngoing && (
                                 <button onClick={() => navigate('/dine-in', { state: { orderId: order._id } })} className="px-2.5 xs:px-4 py-1.5 xs:py-2 bg-orange-500 hover:bg-orange-600 text-white text-[9px] xs:text-[10px] font-black rounded-lg xs:rounded-xl shadow-lg shadow-orange-500/20 flex items-center gap-1.5 uppercase transition-all active:scale-95">
                                     <Plus size={12} strokeWidth={3} /> <span className="hidden xs:inline">Add Item</span><span className="xs:hidden">Add</span>
                                 </button>
@@ -324,53 +315,59 @@ const OrderDetailsModal = ({
                         </div>
                     </div>
                     <div className="space-y-2 xs:space-y-2.5">
-                        {order.items?.filter(i => i.status?.toUpperCase() !== 'CANCELLED').map((item, i) => {
+                        {order.items?.map((item, i) => {
                             const cancelled = item.status?.toUpperCase() === 'CANCELLED';
                             return (
-                                <div key={item._id || i} className={`group flex items-center justify-between p-2.5 xs:p-3.5 rounded-xl xs:rounded-2xl border transition-all ${cancelled ? 'opacity-40 bg-[var(--theme-bg-dark)] border-dashed border-[var(--theme-border)]' : 'bg-white dark:bg-[var(--theme-bg-hover)] border-[var(--theme-border)] shadow-sm hover:shadow-md'}`}>
-                                    <div className="flex items-center gap-2.5 xs:gap-3.5 flex-1 min-w-0">
-                                        <div className="w-8 h-8 xs:w-10 xs:h-10 rounded-lg xs:rounded-xl flex items-center justify-center bg-gray-50 dark:bg-white/5 border border-[var(--theme-border)] shrink-0 shadow-inner">
-                                            <span className="text-[11px] xs:text-xs font-black">{item.quantity}</span>
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <p className="text-[13px] xs:text-[14px] font-black truncate text-[var(--theme-text-main)] leading-tight">{item.name}</p>
-                                                {item.isNewlyAdded && (
-                                                    <span className="bg-orange-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter animate-bounce shadow-sm">NEW</span>
-                                                )}
+                                <div key={item._id || i} className={`group flex flex-col p-2.5 xs:p-3.5 rounded-xl xs:rounded-2xl border transition-all ${cancelled ? 'opacity-50 bg-[var(--theme-bg-dark)] border-dashed border-red-500/20' : 'bg-white dark:bg-[var(--theme-bg-hover)] border-[var(--theme-border)] shadow-sm hover:shadow-md'}`}>
+                                    <div className="flex items-center justify-between w-full">
+                                        <div className="flex items-center gap-2.5 xs:gap-3.5 flex-1 min-w-0">
+                                            <div className="w-8 h-8 xs:w-10 xs:h-10 rounded-lg xs:rounded-xl flex items-center justify-center bg-gray-50 dark:bg-white/5 border border-[var(--theme-border)] shrink-0 shadow-inner">
+                                                <span className="text-[11px] xs:text-xs font-black">{item.quantity}</span>
                                             </div>
-                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                <span className="text-[9px] xs:text-[10px] font-bold text-[var(--theme-text-muted)] opacity-50 uppercase tracking-widest leading-none whitespace-nowrap">{formatPrice(item.price)}</span>
-                                                {item.status && (
-                                                    <span className={`text-[7px] xs:text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border whitespace-nowrap leading-none ${
-                                                        item.status?.toUpperCase() === 'READY' ? 'border-emerald-500/30 text-emerald-500 bg-emerald-500/5' : 
-                                                        item.status?.toUpperCase() === 'CANCELLED' ? 'border-red-500/30 text-red-500 bg-red-500/5' : 
-                                                        'border-orange-500/30 text-orange-500 bg-orange-500/5'
-                                                    }`}>
-                                                        {item.status}
-                                                    </span>
-                                                )}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <p className={`text-[13px] xs:text-[14px] font-black truncate text-[var(--theme-text-main)] leading-tight ${cancelled ? 'line-through' : ''}`}>{item.name}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                    <span className="text-[9px] xs:text-[10px] font-bold text-[var(--theme-text-muted)] opacity-50 uppercase tracking-widest leading-none whitespace-nowrap">{formatPrice(item.price)}</span>
+                                                    {item.status && (
+                                                        <span className={`text-[7px] xs:text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border whitespace-nowrap leading-none ${
+                                                            item.status?.toUpperCase() === 'READY' ? 'border-emerald-500/30 text-emerald-500 bg-emerald-500/5' : 
+                                                            item.status?.toUpperCase() === 'CANCELLED' ? 'border-red-500/30 text-red-500 bg-red-500/5' : 
+                                                            'border-orange-500/30 text-orange-500 bg-orange-500/5'
+                                                        }`}>
+                                                            {item.status}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 xs:gap-4 ml-2">
-                                        <p className="text-[13px] xs:text-[15px] font-black tabular-nums text-[var(--theme-text-main)] tracking-tight">{formatPrice(item.price * item.quantity)}</p>
+                                        <div className="flex items-center gap-2 xs:gap-4 ml-2">
+                                            <p className={`text-[13px] xs:text-[15px] font-black tabular-nums text-[var(--theme-text-main)] tracking-tight ${cancelled ? 'line-through opacity-50' : ''}`}>{formatPrice(item.price * item.quantity)}</p>
 
-                                        {(userRole === 'waiter' || userRole === 'admin') && onCancelItem && !cancelled && (
-                                            <button 
-                                                disabled={item.status?.toUpperCase() !== 'PENDING'}
-                                                onClick={() => onCancelItem(order, item)} 
-                                                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all 
-                                                    ${item.status?.toUpperCase() === 'PENDING' 
-                                                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white active:scale-90 shadow-sm border border-red-500/20' 
-                                                        : 'bg-gray-100 dark:bg-white/5 text-gray-300 dark:text-gray-700 cursor-not-allowed grayscale'
-                                                    }`}
-                                                title={item.status?.toUpperCase() === 'PENDING' ? 'Cancel Item' : 'Already in Progress'}
-                                            >
-                                                <X size={14} strokeWidth={3} />
-                                            </button>
-                                        )}
+                                            {(userRole === 'waiter' || userRole === 'admin') && onCancelItem && !cancelled && !isPaymentOngoing && (
+                                                <button 
+                                                    disabled={item.status?.toUpperCase() !== 'PENDING'}
+                                                    onClick={() => onCancelItem(order, item)} 
+                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all 
+                                                        ${item.status?.toUpperCase() === 'PENDING' 
+                                                            ? 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white active:scale-90 shadow-sm border border-red-500/20' 
+                                                            : 'bg-gray-100 dark:bg-white/5 text-gray-300 dark:text-gray-700 cursor-not-allowed grayscale'
+                                                        }`}
+                                                    title={item.status?.toUpperCase() === 'PENDING' ? 'Cancel Item' : 'Already in Progress'}
+                                                >
+                                                    <X size={14} strokeWidth={3} />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
+                                    {cancelled && item.cancelReason && (
+                                        <div className="mt-1.5 pl-10 xs:pl-14">
+                                            <p className="text-[9px] text-red-500/70 italic font-medium break-words">
+                                                Reason: {item.cancelReason}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -389,7 +386,7 @@ const OrderDetailsModal = ({
                         {userRole !== 'waiter' && (
                             <button 
                                 disabled={isCancelled} 
-                                onClick={() => setShowPrintConfirm(true)} 
+                                onClick={() => printBill(order, formatPrice, settings)} 
                                 className={`w-full h-14 flex items-center justify-center gap-3 rounded-[1.25rem] text-[13px] font-black uppercase tracking-[0.2em] transition-all shadow-xl active:scale-[0.98] ${
                                     isCancelled 
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
@@ -414,24 +411,7 @@ const OrderDetailsModal = ({
                         )}
                     </div>
                 )}
-                {showPrintConfirm && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowPrintConfirm(false)} />
-                        <div className="relative bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col w-full max-w-[280px]">
-                            <div className="p-8 flex flex-col items-center text-center text-black">
-                                <Printer size={32} className="text-orange-500 mb-2" />
-                                <h4 className="text-lg font-black uppercase tracking-tight">Print Ticket?</h4>
-                                <p className="text-[10px] text-gray-500 font-bold uppercase">
-                                    {String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-2 border-t border-gray-100">
-                                <button onClick={() => setShowPrintConfirm(false)} className="h-14 text-[12px] text-gray-400 font-black uppercase border-r border-gray-100">No</button>
-                                <button onClick={() => { printBill(order, formatPrice, settings); setShowPrintConfirm(false); }} className="h-14 text-[12px] text-orange-600 font-black uppercase">Print</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+
             </div>
         );
     }
@@ -454,7 +434,7 @@ const OrderDetailsModal = ({
                     `}>
                         <button onClick={onClose} className="h-16 flex items-center justify-center text-[12px] xs:text-[13px] text-[var(--theme-text-muted)] font-black uppercase tracking-widest hover:bg-gray-100 dark:hover:bg-white/10 active:bg-gray-200 transition-colors border-r border-[var(--theme-border)]">Close</button>
                         {(userRole !== 'waiter' || onProcessPayment) && (
-                            <button disabled={isCancelled || isPaid || !isReady} onClick={() => onProcessPayment ? onProcessPayment(order) : setShowPrintConfirm(true)} className={`h-16 flex items-center justify-center text-[12px] xs:text-[13px] font-black uppercase tracking-widest transition-all ${isCancelled || (onProcessPayment && (isPaid || !isReady)) ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed opacity-50' : (onProcessPayment ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10' : 'text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10')}`}>
+                            <button disabled={isCancelled || isPaid || !isReady} onClick={() => onProcessPayment ? onProcessPayment(order) : printBill(order, formatPrice, settings)} className={`h-16 flex items-center justify-center text-[12px] xs:text-[13px] font-black uppercase tracking-widest transition-all ${isCancelled || (onProcessPayment && (isPaid || !isReady)) ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed opacity-50' : (onProcessPayment ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10' : 'text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10')}`}>
                                 {onProcessPayment ? (
                                     <div className="flex flex-col items-center">
                                         <Banknote size={18} strokeWidth={3} className="mb-0.5" />
@@ -470,23 +450,7 @@ const OrderDetailsModal = ({
                         )}
                     </div>
                 </div>
-                {showPrintConfirm && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-scale-in">
-                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[4px]" onClick={() => setShowPrintConfirm(false)} />
-                        <div className="relative bg-white rounded-[1.5rem] shadow-2xl overflow-hidden flex flex-col w-full max-w-[260px]">
-                            <div className="p-6 flex flex-col items-center text-center gap-1.5 text-black">
-                                <h4 className="text-[17px] font-black uppercase tracking-tight">Print Ticket?</h4>
-                                <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">
-                                    {String(order.orderNumber || '').startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '#') : `#${order.orderNumber}`}
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-2 border-t border-gray-100">
-                                <button onClick={() => setShowPrintConfirm(false)} className="h-14 text-[12px] text-gray-400 font-black uppercase border-r border-gray-100">No</button>
-                                <button onClick={() => { printBill(order, formatPrice, settings); setShowPrintConfirm(false); }} className="h-14 text-[12px] text-orange-600 font-black uppercase">Print</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+
             </div>
         </div>
     );

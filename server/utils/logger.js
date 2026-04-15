@@ -34,7 +34,7 @@ const consoleFormat = isProd
         format.printf(({ timestamp, level, message, metadata }) => {
             const hasMeta = Object.keys(metadata).length > 0;
             // Only show metadata for errors or if explicitly set to debug
-            const showMeta = (level.includes('error') || process.env.LOG_LEVEL === 'debug');
+            const showMeta = (level.includes('error') || level.includes('warn') || process.env.LOG_LEVEL === 'debug');
             const meta = (hasMeta && showMeta)
                 ? `\n${JSON.stringify(metadata, null, 2)}`
                 : '';

@@ -1,7 +1,8 @@
-import { useState, useContext, useEffect, useMemo, useCallback } from 'react';
+import { useState, useContext, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
+import { queueOrder } from '../../utils/syncEngine';
 import {
     Search, ShoppingCart, ArrowLeft, ArrowRight,
     Utensils, ChevronRight, ChevronLeft, SearchX, Trash2, Plus, Minus, X,
@@ -13,6 +14,7 @@ import FoodItem from '../../components/FoodItem';
 import useMenuData from '../../hooks/useMenuData';
 import useDebounce from '../../hooks/useDebounce';
 import OptimizedImage from '../../components/OptimizedImage';
+import { calculateTax } from '../../utils/tax';
 
 /**
  * Dine-In Order Page
@@ -22,6 +24,13 @@ const DineIn = () => {
     const { user, formatPrice, settings = {}, socket, socketConnected } = useContext(AuthContext);
     const location = useLocation();
     const navigate = useNavigate();
+
+    // Redirect away if dine-in is disabled in settings
+    useEffect(() => {
+        if (settings?.dineInEnabled === false || settings?.dineInEnabled === 0) {
+            navigate('/waiter', { replace: true });
+        }
+    }, [settings, navigate]);
 
     const queryParams = new URLSearchParams(location.search);
     const orderIdFromUrl = queryParams.get('orderId');
@@ -37,6 +46,7 @@ const DineIn = () => {
     const [originalTotal, setOriginalTotal] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderLoading, setOrderLoading] = useState(!!initialOrderId);
+    const prevCartLength = useRef(0);
 
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 250);
@@ -115,9 +125,25 @@ const DineIn = () => {
         const price = variant ? variant.price : item.price;
         setCart(prev => {
             const existing = prev.find(i => i.cartKey === cartKey);
-            if (existing) return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: existing.quantity + 1 } : i);
+            if (existing) {
+                console.log('Cart updated: Quantity increased for', item.name);
+                return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: existing.quantity + 1 } : i);
+            }
+            console.log('Cart updated: Item added -', item.name);
             return [...prev, { ...item, cartKey, price, variant: variant || null, quantity: 1, notes: '' }];
         });
+    }, []);
+
+    const resetOrderSession = useCallback(() => {
+        console.log('Cart empty – session reset');
+        setCart([]);
+        setExistingItems([]);
+        setSelectedTable(null);
+        setExistingOrderId(null);
+        setIsAddingItems(false);
+        setStep(2); // Go back to table selection
+        setIsCartOpen(false);
+        console.log('New order started');
     }, []);
 
     const updateQuantity = useCallback((cartKey, delta) => {
@@ -125,17 +151,41 @@ const DineIn = () => {
             const existing = prev.find(i => i.cartKey === cartKey);
             if (!existing) return prev;
             const newQty = existing.quantity + delta;
-            if (newQty <= 0) return prev.filter(i => i.cartKey !== cartKey);
+            
+            if (newQty <= 0) {
+                console.log('Item removed:', existing.name);
+                const updated = prev.filter(i => i.cartKey !== cartKey);
+                if (updated.length === 0) {
+                    // This will be caught by the useEffect to trigger resetOrderSession
+                }
+                return updated;
+            }
+            console.log('Cart updated:', existing.name, 'quantity set to', newQty);
             return prev.map(i => i.cartKey === cartKey ? { ...i, quantity: newQty } : i);
         });
     }, []);
+
+    // Effect to handle full reset when cart becomes empty
+    useEffect(() => {
+        if (prevCartLength.current > 0 && cart.length === 0) {
+            // User manually removed all items or cleared the cart
+            if (step === 3) {
+                resetOrderSession();
+            }
+        }
+        prevCartLength.current = cart.length;
+    }, [cart.length, step, resetOrderSession]);
 
     const handleItemAdd = (item, variant = null) => {
         if (!variant && item.variants?.length > 0) return;
         addToCart(item, variant);
     };
 
-    const clearCart = () => { if (window.confirm('Clear all items?')) setCart([]); };
+    const clearCart = () => { 
+        if (window.confirm('Clear all items and reset order?')) {
+            resetOrderSession();
+        }
+    };
 
     // ── Deduplicated categories (from API list + menu item categories) ───
     const categories = useMemo(() => {
@@ -167,11 +217,13 @@ const DineIn = () => {
     }, [cart]);
 
     const totalAmount = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart]);
-    const sgst = settings?.sgst || 0;
-    const cgst = settings?.cgst || 0;
-    const sValue = totalAmount * (sgst / 100);
-    const cValue = totalAmount * (cgst / 100);
-    const finalAmount = totalAmount + sValue + cValue;
+    
+    const prevSubtotal = originalTotal || 0;
+    const combinedSubtotal = prevSubtotal + totalAmount;
+    
+    // Use centralized utility for estimation matching Backend
+    const taxResults = calculateTax(combinedSubtotal, settings, { discount: 0 });
+    const { sgst: sValue, cgst: cValue, finalAmount: finalAmount, sgstRate, cgstRate } = taxResults;
 
     const handleSubmitOrder = async () => {
         if (!socketConnected) {
@@ -208,9 +260,20 @@ const DineIn = () => {
                 });
             }
             navigate('/waiter', { replace: true });
-        } catch (err) {
-            console.error('Submit order failed:', err);
-            alert('Order failed: ' + (err.response?.data?.message || 'Server Error'));
+        } catch (apiErr) {
+            console.log('[DineIn] Order failed, queuing offline:', apiErr.message);
+            const { localId, tokenNumber } = await queueOrder({
+                tableId,
+                type: orderType,
+                items: orderData.items,
+                totalAmount: orderData.totalAmount,
+                sgst: orderData.sgst,
+                cgst: orderData.cgst,
+                finalAmount: orderData.finalAmount,
+            });
+            alert(`Order saved offline with token TK${tokenNumber}. Will sync when online.`);
+            navigate('/waiter', { replace: true });
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -246,18 +309,12 @@ const DineIn = () => {
                         style={{ overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' }}
                     >
                         <TableGrid
-                            allowedStatuses={['available', 'occupied', 'reserved']}
+                            allowedStatuses={['available']}
                             filterByAllowedStatuses={false}
-                            showCleanAction={true}
+                            showCleanAction={false}
                             onSelectTable={(table) => {
-                                if (table.status === 'occupied' && table.currentOrderId) {
-                                    setExistingOrderId(table.currentOrderId);
-                                    setIsAddingItems(true);
-                                    setStep(3);
-                                } else {
-                                    setSelectedTable(table);
-                                    setStep(3);
-                                }
+                                setSelectedTable(table);
+                                setStep(3);
                             }}
                         />
                     </div>
@@ -436,20 +493,23 @@ const DineIn = () => {
                             {/* Scrollable items / Empty State */}
                             <div className="flex-1 kot-scroll min-h-0 flex flex-col">
                                 {cart.length === 0 && (!isAddingItems || existingItems.length === 0) ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center text-center p-10 animate-fade-in">
-                                        <div className="w-24 h-24 rounded-full bg-[var(--theme-bg-dark)] flex items-center justify-center mb-6 border border-[var(--theme-border)] shadow-inner">
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center p-10 animate-fade-in bg-[var(--theme-bg-deep)]/30 m-4 rounded-[2rem] border-2 border-dashed border-[var(--theme-border)]">
+                                        <div className="w-24 h-24 rounded-full bg-[var(--theme-bg-dark)] flex items-center justify-center mb-6 border border-[var(--theme-border)] shadow-xl relative">
                                             <ShoppingCart size={32} className="text-[var(--theme-text-muted)] opacity-20" />
+                                            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-lg">
+                                                <Plus size={16} strokeWidth={3} />
+                                            </div>
                                         </div>
-                                        <h3 className="text-lg font-black text-[var(--theme-text-main)] uppercase tracking-tight mb-2">Your cart is empty</h3>
+                                        <h3 className="text-lg font-black text-[var(--theme-text-main)] uppercase tracking-tight mb-2">Cart is empty</h3>
                                         <p className="text-xs text-[var(--theme-text-muted)] max-w-[200px] font-bold leading-relaxed opacity-60">
-                                            Add some delicious items from the menu to start your order
+                                            Select delicious items from the menu to build your order.
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="px-4 py-4 space-y-4">
-                                        {isAddingItems && existingItems.length > 0 && (
+                                        {isAddingItems && existingItems.filter(item => item.status !== 'CANCELLED').length > 0 && (
                                             <div className="space-y-2 opacity-60">
-                                                {existingItems.map((item, idx) => (
+                                                {existingItems.filter(item => item.status !== 'CANCELLED').map((item, idx) => (
                                                     <div key={idx} className="flex items-center justify-between text-[10px] font-bold text-[var(--theme-text-muted)] uppercase tracking-tight py-1 border-b border-[var(--theme-border)]/30">
                                                         <div className="flex items-center gap-2">
                                                             <span>{item.quantity}x</span>
@@ -467,38 +527,50 @@ const DineIn = () => {
                                         )}
 
                                         {cart.map(item => (
-                                            <div key={item.cartKey} className="flex items-center gap-3 animate-slide-up hover:bg-orange-500/5 p-1 -m-1 rounded-xl transition-colors group">
+                                            <div key={item.cartKey} className="flex items-start gap-4 animate-slide-up hover:bg-orange-500/5 p-2 -m-1 rounded-2xl transition-all group border border-transparent hover:border-[var(--theme-border)]/50">
                                                 <OptimizedImage 
                                                     src={item.image} 
                                                     alt={item.name} 
                                                     width={100}
-                                                    containerClassName="w-10 h-10 rounded-lg flex-shrink-0 shadow-sm"
+                                                    containerClassName="w-12 h-12 rounded-xl flex-shrink-0 shadow-lg border border-[var(--theme-border)]/30 overflow-hidden"
                                                 />
-                                                <div className="flex-1 min-w-0 flex items-center justify-between gap-1.5">
-                                                    <div className="min-w-0 flex-1 pr-1">
-                                                        <h4 className="text-[12px] font-black text-[var(--theme-text-main)] truncate leading-tight uppercase tracking-tighter">{item.name}</h4>
-                                                        {item.variant && <p className="text-[8px] font-black text-orange-500 uppercase leading-none mt-0.5">{item.variant.name}</p>}
+                                                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0 flex-1">
+                                                            <h4 className="text-[13px] font-medium text-[var(--theme-text-main)] line-clamp-2 leading-tight uppercase tracking-tight group-hover:text-orange-500 transition-colors">
+                                                                {item.name}
+                                                            </h4>
+                                                            {item.variant && (
+                                                                <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest mt-1 bg-orange-500/10 px-1.5 py-0.5 rounded-md inline-block">
+                                                                    {item.variant.name}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-[13px] font-black text-orange-500 tabular-nums tracking-tighter shrink-0">
+                                                            {formatPrice(item.price * item.quantity)}
+                                                        </span>
                                                     </div>
 
-                                                    <div className="flex items-center shrink-0">
-                                                        <div className="flex items-center bg-[var(--theme-bg-dark)] rounded-full p-0.5 border border-[var(--theme-border)] shadow-inner">
+                                                    <div className="flex items-center justify-between mt-1">
+                                                        <div className="flex items-center bg-[var(--theme-bg-dark)] rounded-xl p-0.5 border border-[var(--theme-border)] shadow-inner">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); updateQuantity(item.cartKey, -1); }}
-                                                                className="w-6 h-6 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-orange-500 transition-all active:scale-75"
+                                                                className="w-7 h-7 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-all active:scale-75"
                                                             >
-                                                                <Minus size={11} strokeWidth={3} />
+                                                                <Minus size={12} strokeWidth={3} />
                                                             </button>
-                                                            <span className="w-5 text-center text-[10px] font-black text-[var(--theme-text-main)] tabular-nums">{item.quantity}</span>
+                                                            <span className="w-8 text-center text-[11px] font-black text-[var(--theme-text-main)] tabular-nums">{item.quantity}</span>
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); updateQuantity(item.cartKey, 1); }}
-                                                                className="w-6 h-6 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-orange-500 transition-all active:scale-75"
+                                                                className="w-7 h-7 flex items-center justify-center text-[var(--theme-text-muted)] hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-all active:scale-75"
                                                             >
-                                                                <Plus size={11} strokeWidth={3} />
+                                                                <Plus size={12} strokeWidth={3} />
                                                             </button>
                                                         </div>
+                                                        <span className="text-[9px] font-bold text-[var(--theme-text-muted)] uppercase tracking-widest opacity-40">
+                                                            {formatPrice(item.price)} ea
+                                                        </span>
                                                     </div>
-
-                                                    <span className="text-[12px] font-black text-orange-500 min-w-[50px] text-right tabular-nums tracking-tighter shrink-0">{formatPrice(item.price * item.quantity)}</span>
                                                 </div>
                                             </div>
                                         ))}
@@ -511,40 +583,49 @@ const DineIn = () => {
                                 <div className="flex-shrink-0 p-4 bg-[var(--theme-bg-dark)] border-t border-[var(--theme-border)] space-y-3">
                                     <div className="space-y-1.5">
                                         {isAddingItems ? (
-                                            <>
-                                                <div className="flex justify-between text-[10px] font-bold text-[var(--theme-text-muted)] uppercase tracking-wider italic">
-                                                    <span>Previous Balance</span>
-                                                    <span>{formatPrice(originalTotal)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-[11px] font-bold text-[var(--theme-text-main)] uppercase tracking-wide">
-                                                    <span>New Items Subtotal</span>
-                                                    <span>{formatPrice(totalAmount)}</span>
-                                                </div>
-                                                {sgst > 0 && <div className="flex justify-between text-[10px] font-bold text-[var(--theme-text-muted)]">
-                                                    <span>SGST ({sgst}%)</span>
-                                                    <span>{formatPrice(totalAmount * sgst / 100)}</span>
-                                                </div>}
-                                                {cgst > 0 && (
-                                                    <div className="flex justify-between text-[10px] font-bold text-[var(--theme-text-muted)]">
-                                                        <span>CGST ({cgst}%)</span>
-                                                        <span>{formatPrice(totalAmount * cgst / 100)}</span>
-                                                    </div>
-                                                )}
-                                                <div className="flex justify-between items-center pt-2 border-t-2 border-dashed border-[var(--theme-border)]">
-                                                    <div>
-                                                        <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] block leading-none">NEW COMBINED TOTAL</span>
-                                                        <span className="text-[10px] font-bold text-[var(--theme-text-muted)] italic">Adding {formatPrice(totalAmount + sValue + cValue)}</span>
-                                                    </div>
-                                                    <span className="text-2xl font-black text-orange-500 tabular-nums">
-                                                        {formatPrice(originalTotal + totalAmount + sValue + cValue)}
-                                                    </span>
-                                                </div>
-                                            </>
+                                            (() => {
+                                                const existingItemsActive = existingItems.filter(i => i.status !== 'CANCELLED');
+                                                const existingSubtotal = existingItemsActive.reduce((s, i) => s + (i.price * i.quantity), 0);
+                                                const combinedSubtotal = existingSubtotal + totalAmount;
+                                                
+                                                const taxResults = calculateTax(combinedSubtotal, settings, { discount: 0 });
+                                                const { sgst: combinedSgst, cgst: combinedCgst, finalAmount: combinedFinal, sgstRate, cgstRate } = taxResults;
+
+                                                return (
+                                                    <>
+                                                        <div className="flex justify-between text-[11px] font-bold text-[var(--theme-text-main)] uppercase tracking-wide">
+                                                            <span>New Subtotal (All Items)</span>
+                                                            <span>{formatPrice(combinedSubtotal)}</span>
+                                                        </div>
+                                                        {sgstRate > 0 && (
+                                                            <div className="flex justify-between text-[10px] font-bold text-[var(--theme-text-muted)]">
+                                                                <span>Combined SGST ({sgstRate}%)</span>
+                                                                <span>{formatPrice(combinedSgst)}</span>
+                                                            </div>
+                                                        )}
+                                                        {cgstRate > 0 && (
+                                                            <div className="flex justify-between text-[10px] font-bold text-[var(--theme-text-muted)]">
+                                                                <span>Combined CGST ({cgstRate}%)</span>
+                                                                <span>{formatPrice(combinedCgst)}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-between items-center pt-2 border-t-2 border-dashed border-[var(--theme-border)]">
+                                                            <div>
+                                                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] block leading-none">NEW TOTAL ESTIMATE</span>
+                                                                <span className="text-[10px] font-bold text-[var(--theme-text-muted)] italic">Includes {existingItemsActive.length} old + {cart.length} new</span>
+                                                            </div>
+                                                            <span className="text-2xl font-black text-orange-500 tabular-nums">
+                                                                {formatPrice(combinedFinal)}
+                                                            </span>
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()
                                         ) : cart.length > 0 ? (
                                             <>
                                                 <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>Subtotal</span><span>{formatPrice(totalAmount)}</span></div>
-                                                {sgst > 0 && <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>SGST ({sgst}%)</span><span>{formatPrice(totalAmount * sgst / 100)}</span></div>}
-                                                {cgst > 0 && <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>CGST ({cgst}%)</span><span>{formatPrice(totalAmount * cgst / 100)}</span></div>}
+                                                {sgstRate > 0 && <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>SGST ({sgstRate}%)</span><span>{formatPrice(totalAmount * sgstRate / 100)}</span></div>}
+                                                {cgstRate > 0 && <div className="flex justify-between text-xs text-[var(--theme-text-muted)]"><span>CGST ({cgstRate}%)</span><span>{formatPrice(totalAmount * cgstRate / 100)}</span></div>}
                                                 <div className="flex justify-between items-center pt-1.5 border-t border-[var(--theme-border)]">
                                                     <span className="text-xs font-bold text-[var(--theme-text-main)] uppercase tracking-wider">Total</span>
                                                     <span className="text-xl font-black text-orange-500">{formatPrice(finalAmount)}</span>
@@ -573,7 +654,7 @@ const DineIn = () => {
             )}
 
             {/* ── Mobile Floating Cart Bar ── */}
-            {step === 3 && cart.length > 0 && !isCartOpen && (
+            {step === 3 && !isCartOpen && (
                 <div className="md:hidden fixed bottom-6 left-4 right-4 z-[90] animate-in slide-in-from-bottom-10 fade-in duration-500">
                     <button
                         onClick={() => setIsCartOpen(true)}

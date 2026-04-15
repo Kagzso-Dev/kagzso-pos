@@ -1,5 +1,5 @@
-import { memo, useContext } from 'react';
-import { Menu, ChevronLeft, ChevronRight, LogOut, Armchair, Settings, Palette } from 'lucide-react';
+import { memo, useContext, useState, useEffect } from 'react';
+import { Menu, ChevronLeft, ChevronRight, LogOut, Armchair, Settings, Palette, Wifi, WifiOff } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,18 @@ import ThemeSwitcher from './ThemeSwitcher';
 const TopBar = memo(({ onMenuClick, sidebarCollapsed }) => {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     const handleLogout = () => {
         logout();
@@ -48,12 +60,18 @@ const TopBar = memo(({ onMenuClick, sidebarCollapsed }) => {
                 {/* ── Center: Portal (Dynamic Page Controls) ── */}
                 <div id="topbar-portal" className="flex-1 flex items-center justify-start overflow-hidden min-w-0" />
  
-                {/* ── Right: Operations & Utilities ── */}
+{/* ── Right: Operations & Utilities ── */}
                 <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0 ml-auto">
                     
-                    
+                    {!isOnline && (
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30">
+                            <WifiOff size={14} />
+                            <span className="hidden xs:inline">OFFLINE</span>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-1.5 sm:gap-2">
- 
+  
                         {/* Notifications */}
                         <NotificationBell />
  
@@ -63,28 +81,20 @@ const TopBar = memo(({ onMenuClick, sidebarCollapsed }) => {
                                 <button
                                     onClick={() => navigate('/admin/tables')}
                                     title="Table Map"
-                                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all duration-200 border border-blue-500/20 active:scale-95 shadow-sm"
+                                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-500/10 text-white hover:bg-blue-500 hover:text-white transition-all duration-200 border border-blue-500/30 active:scale-95 shadow-sm"
                                 >
                                     <Armchair size={18} />
                                 </button>
                                 <button
                                     onClick={() => navigate('/admin/settings')}
                                     title="Settings"
-                                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition-all duration-200 border border-orange-500/20 active:scale-95 shadow-sm"
+                                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-orange-500/10 text-white hover:bg-orange-500 hover:text-white transition-all duration-200 border border-orange-500/30 active:scale-95 shadow-sm"
                                 >
                                     <Settings size={18} />
                                 </button>
                             </>
                         )}
  
-                        {/* Sign Out — Hidden on mobile to avoid duplication with page-specific actions */}
-                        <button
-                            onClick={handleLogout}
-                            title="Sign Out"
-                            className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200 border border-red-500/20 active:scale-95 shadow-sm"
-                        >
-                            <LogOut size={18} />
-                        </button>
                     </div>
                 </div>
             </div>

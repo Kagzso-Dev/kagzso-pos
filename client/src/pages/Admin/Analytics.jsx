@@ -16,7 +16,7 @@ import NotificationBell from '../../components/NotificationBell';
 /* ── Analytics Module ─────────────────────────────────────────────────── */
 
 const Analytics = () => {
-    const { socket, formatPrice } = useContext(AuthContext);
+    const { socket, formatPrice, settings } = useContext(AuthContext);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -217,7 +217,7 @@ const Analytics = () => {
                             </button>
                         ))}
                     </div>
-                    <NotificationBell />
+                    {/* <NotificationBell /> */}
 
                     <button
                         onClick={exportExcel}
@@ -274,7 +274,7 @@ const Analytics = () => {
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--theme-border)" />
                                     <XAxis dataKey="label" stroke="var(--theme-text-muted)" fontSize={10} tickLine={false} axisLine={false} />
-                                    <YAxis yAxisId="left" stroke="var(--theme-text-muted)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} width={60} />
+                                    <YAxis yAxisId="left" stroke="var(--theme-text-muted)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `${settings?.currencySymbol || '₹'}${v}`} width={60} />
                                     <YAxis yAxisId="right" orientation="right" stroke="var(--theme-text-muted)" fontSize={10} tickLine={false} axisLine={false} width={30} />
                                     <Tooltip {...tooltipStyle} formatter={(val, name) => name === 'Revenue' ? formatPrice(val) : val} />
                                     <Legend />
@@ -348,7 +348,7 @@ const Analytics = () => {
                                         fontSize={10}
                                         tickLine={false}
                                         axisLine={false}
-                                        tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                                        tickFormatter={(v) => `${settings?.currencySymbol || '₹'}${(v / 1000).toFixed(0)}k`}
                                         domain={[0, 'dataMax']}
                                     />
                                     <YAxis dataKey="waiterName" type="category" stroke="var(--theme-text-muted)" width={70} fontSize={11} />
@@ -405,7 +405,7 @@ const Analytics = () => {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--theme-border)" />
                                     {/* MySQL returns "hour" directly (not "_id.hour" like MongoDB) */}
                                     <XAxis dataKey="hour" stroke="var(--theme-text-muted)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(h) => `${h}:00`} />
-                                    <YAxis stroke="var(--theme-text-muted)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} width={55} />
+                                    <YAxis stroke="var(--theme-text-muted)" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `${settings?.currencySymbol || '₹'}${v}`} width={55} />
                                     <Tooltip {...tooltipStyle} formatter={(v) => [formatPrice(v), 'Revenue']} />
                                     <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                 </BarChart>

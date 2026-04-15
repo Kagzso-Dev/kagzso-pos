@@ -8,7 +8,7 @@ import {
     ChevronRight, X, TrendingUp, Bell, History, XCircle, CheckCircle2, Armchair,
     Package
 } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+const logoImg = '/logo.png';
 import ThemeSwitcher from './ThemeSwitcher';
 
 
@@ -45,11 +45,21 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
     };
 
     /* ── NavItem ─────────────────────────────────────────────────────── */
-    const NavItem = ({ to, icon: Icon, label, color = 'text-[var(--theme-text-muted)]', badge }) => {
-        const active = isActive(to);
+    const NavItem = ({ to, onClick, icon: Icon, label, color = 'text-[var(--theme-text-muted)]', badge }) => {
+        const active = to ? isActive(to) : false;
+
+        const handleClick = () => {
+            if (onClick) {
+                onClick();
+                if (onClose) onClose();
+            } else if (to) {
+                handleNav(to);
+            }
+        };
+
         return (
             <button
-                onClick={() => handleNav(to)}
+                onClick={handleClick}
                 title={collapsed ? label : undefined}
                 className={`
                     w-full flex items-center rounded-xl transition-all duration-300 group relative tap-scale overflow-hidden
@@ -66,7 +76,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                 )}
                 <Icon
                     size={20}
-                    className={`flex-shrink-0 transition-all duration-300 ${active ? 'text-orange-400 scale-110' : color} group-hover:text-orange-400`}
+                    className={`flex-shrink-0 transition-all duration-300 ${active ? 'text-white scale-110' : color} group-hover:text-white`}
                 />
                 {!collapsed && (
                     <span className="font-bold text-[13px] tracking-tight truncate uppercase">{label}</span>
@@ -111,7 +121,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
 
             {/* ── Header ─────────────────────────────────────────────── */}
             <div className={`flex items-center border-b border-[var(--theme-border)] flex-shrink-0 pt-safe relative h-[80px] ${collapsed ? 'justify-center' : 'justify-start px-5'} bg-gradient-to-b from-white/5 to-transparent`}>
-                
+
                 {/* Logo & Brand Group - Left Aligned */}
                 <div
                     onClick={() => handleNav('/')}
@@ -124,18 +134,18 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
 
                     {!collapsed && (
                         <div className="flex flex-col justify-center text-left">
-                            <h1 className="text-sm font-black tracking-tight text-[var(--theme-text-main)] truncate leading-none uppercase flex items-center gap-2">
-                                KAGZSO
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--theme-border)]">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${socketConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'} `} />
-                                    <span className={`text-[8px] font-black tracking-widest ${socketConnected ? 'text-emerald-500' : 'text-red-500'}`}>
-                                        {socketConnected ? 'LIVE' : 'OFFLINE'}
-                                    </span>
-                                </div>
+                            <span className="text-sm font-black text-orange-500 uppercase leading-tight">KAGZSO</span>
+                            <h1 className="text-xs font-black tracking-tight text-[var(--theme-text-main)] truncate leading-tight uppercase flex items-center gap-2">
+                                {settings?.restaurantName || 'admin'}
+                                {socketConnected && (
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                        <span className="text-[8px] font-black tracking-widest text-emerald-500 uppercase">
+                                            LIVE
+                                        </span>
+                                    </div>
+                                )}
                             </h1>
-                            <p className="text-[9px] text-[var(--theme-text-muted)] font-black uppercase tracking-[0.2em] mt-1 opacity-70">
-                                {settings?.restaurantName || 'Premium POS'}
-                            </p>
                         </div>
                     )}
                 </div>
@@ -188,6 +198,10 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                         <NavItem to="/admin/notifications" icon={Bell} label="Notifications" color="text-orange-400" badge={unreadCount > 0 ? unreadCount : null} />
                         <NavItem to="/admin/menu" icon={Coffee} label="Menu Items" />
                         <NavItem to="/admin/categories" icon={Layers} label="Categories" />
+                        <SectionLabel>Live Views</SectionLabel>
+                        <NavItem to="/kitchen" icon={ChefHat} label="Kitchen View" color="text-orange-400" />
+                        <NavItem to="/cashier" icon={Monitor} label="Cashier Point" color="text-green-400" />
+                        <NavItem to="/waiter" icon={Armchair} label="Order View" color="text-yellow-400" />
                     </>
                 )}
 
@@ -198,7 +212,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
 
                         {user.role === 'kitchen' && (
                             <>
-                                <NavItem to="/kitchen?tab=active" icon={ChefHat} label="Active" color="text-orange-400" />
+                                <NavItem to="/kitchen?tab=active" icon={ChefHat} label="Active KOTs" color="text-orange-400" />
                             </>
                         )}
 
@@ -206,36 +220,33 @@ const Sidebar = ({ collapsed = false, onToggleCollapse, onClose }) => {
                             <>
                                 <NavItem to="/cashier" icon={Monitor} label="Cashier Point" color="text-green-400" />
                                 <NavItem to="/waiter" icon={Armchair} label="Order View" color="text-yellow-400" />
-                                <NavItem to="/cashier/kitchen-view" icon={ChefHat} label="Kitchen View" color="text-orange-400" />
+                                <NavItem to="/kitchen" icon={ChefHat} label="Kitchen View" color="text-orange-400" />
                             </>
                         )}
 
                         {user.role === 'waiter' && (
                             <>
                                 <NavItem to="/waiter" icon={LayoutDashboard} label="Waiter Dashboard" color="text-pink-400" />
-                                <NavItem to="/waiter/kitchen-view" icon={ChefHat} label="Kitchen View" color="text-emerald-400" />
+                                <NavItem to="/kitchen" icon={ChefHat} label="Kitchen View" color="text-emerald-400" />
                                 <NavItem to="/waiter/history" icon={History} label="Order History" color="text-purple-400" />
                             </>
                         )}
                     </>
                 )}
 
-                {/* Logout shortcut – only for specific roles as requested. Hidden on md+ to avoid duplication with TopBar */}
-                {['admin', 'cashier', 'kitchen'].includes(user.role) && (
-                    <div className="md:hidden mt-8 pt-10 border-t border-[var(--theme-border)]">
-                        <SectionLabel>Session</SectionLabel>
-                        <NavItem 
-                            to="/logout" 
-                            icon={LogOut} 
-                            label="Sign Out" 
-                            color="text-rose-500" 
-                        />
-                    </div>
-                )}
-
                 {/* Theme Selector - Bottom of Nav */}
-                <div className={`mt-auto pt-6 border-t border-[var(--theme-border)] ${collapsed ? 'px-0' : 'px-2'}`}>
-                     <ThemeSwitcher collapsed={collapsed} />
+                <div className={`mt-auto pt-4 border-t border-[var(--theme-border)] ${collapsed ? 'px-0' : 'px-2'}`}>
+                    <ThemeSwitcher collapsed={collapsed} />
+                </div>
+
+                {/* RELOCATED: Logout button - Always visible for all devices and roles */}
+                <div className="mt-2 mb-2 px-1">
+                    <NavItem
+                        onClick={handleLogout}
+                        icon={LogOut}
+                        label="Sign Out"
+                        color="text-rose-500"
+                    />
                 </div>
             </nav>
 

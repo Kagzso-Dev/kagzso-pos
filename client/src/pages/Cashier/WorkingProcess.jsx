@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api';
-import logoImg from '../../assets/logo.png';
+const logoImg = '/logo.png';
 import { Printer, ChefHat, List, Grid, RefreshCw, Clock, CheckCircle, Play, Timer, X } from 'lucide-react';
 
 const WorkingProcess = () => {
@@ -35,19 +35,62 @@ const WorkingProcess = () => {
 
         if (!socket) return;
 
+        const playNotificationSound = () => {
+            try {
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                audio.volume = 0.5;
+                audio.loop = true;
+                audio.play().catch(e => console.log('Audio play blocked. Interact with the page to enable sounds.', e));
+
+                // Stop after 5 seconds
+                setTimeout(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }, 5000);
+            } catch (err) {
+                console.error('Error playing sound:', err);
+            }
+        };
+
         const onNewOrder = (newOrder) => {
-            setOrders(prev => prev.find(o => o._id === newOrder._id) ? prev : [newOrder, ...prev]);
+            setOrders(prev => {
+                const alreadyExists = prev.find(o => o._id === newOrder._id);
+                if (alreadyExists) return prev;
+                
+                // Only sound bell for new preparation tasks IF user is kitchen staff
+                if (user.role === 'kitchen' && ['pending', 'preparing', 'accepted'].includes(newOrder.orderStatus)) {
+                    playNotificationSound();
+                }
+                return [newOrder, ...prev];
+            });
         };
 
         const onOrderUpdated = (updatedOrder) => {
-            const isDone = ['completed', 'cancelled'].includes(updatedOrder.orderStatus);
+            if (!updatedOrder) return;
+            const status = updatedOrder.orderStatus?.toLowerCase();
+            const isDone = ['completed', 'cancelled', 'payment'].includes(status);
+            
             setOrders(prev => {
                 const existing = prev.find(o => o._id === updatedOrder._id);
                 if (isDone) return prev.filter(o => o._id !== updatedOrder._id);
-                if (existing) return prev.map(o => o._id === updatedOrder._id ? updatedOrder : o);
+                
+                if (existing) {
+                    // Play sound ONLY if new items added to an active prep order (KITCHEN ONLY)
+                    const oldItems = existing.items?.length || 0;
+                    const newItems = updatedOrder.items?.length || 0;
+                    if (user.role === 'kitchen' && newItems > oldItems && ['pending', 'preparing', 'accepted'].includes(status)) {
+                        playNotificationSound();
+                    }
+                    return prev.map(o => o._id === updatedOrder._id ? updatedOrder : o);
+                }
+                
+                // New prep order coming into range (KITCHEN ONLY)
+                if (user.role === 'kitchen' && ['pending', 'preparing', 'accepted'].includes(status)) {
+                    playNotificationSound();
+                }
                 return [updatedOrder, ...prev];
             });
-            // Update selectedOrder without needing it in deps — compare by id at call time
+
             setSelectedOrder(prev => {
                 if (!prev || prev._id !== updatedOrder._id) return prev;
                 return isDone ? null : updatedOrder;
@@ -130,11 +173,15 @@ const WorkingProcess = () => {
             ? `TBL ${selectedOrder.tableId?.number || selectedOrder.tableId || '?'}`
             : `TOK ${selectedOrder.tokenNumber}`;
 
+        const orderNum = selectedOrder.orderType === 'dine-in' ? 'DI' : 'TK';
+        const ordNum = String(selectedOrder.orderNumber).startsWith('ORD-') ? String(selectedOrder.orderNumber).replace('ORD-', '') : selectedOrder.orderNumber;
+        const displayOrderNumber = `${orderNum}-${ordNum}`;
+
         const html = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8"/>
-    <title>KOT - ${selectedOrder.orderNumber}</title>
+    <title>KOT - ${displayOrderNumber}</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family: monospace, sans-serif; background:#fff; color:#000; padding:12px; }
@@ -143,16 +190,14 @@ const WorkingProcess = () => {
 </head>
 <body>
     <div style="max-width:320px;margin:0 auto;position:relative;overflow:hidden;">
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0.05;pointer-events:none;transform:rotate(45deg);">
-            <span style="font-size:80px;font-weight:900;letter-spacing:4px;">KOT</span>
-        </div>
+        {/* Watermark removed */}
         <div style="text-align:center;border-bottom:2px dashed #d1d5db;padding-bottom:12px;margin-bottom:12px;">
             <h1 style="font-size:22px;font-weight:900;letter-spacing:1px;">KITCHEN ORDER</h1>
             <p style="font-size:11px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:2px;margin-top:4px;">${selectedOrder.orderType}</p>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:12px;">
             <div>
-                <p><strong>Order:</strong> ${selectedOrder.orderNumber}</p>
+                <p><strong>Order:</strong> ${displayOrderNumber}</p>
                 <p><strong>Time:</strong> ${new Date(selectedOrder.createdAt).toLocaleTimeString()}</p>
             </div>
             <div style="text-align:right;">
@@ -340,7 +385,7 @@ const WorkingProcess = () => {
                                             {tokenLabel}
                                         </span>
                                         <span className="text-[8px] font-bold opacity-50 uppercase tracking-[0.2em] mt-1 group-hover:opacity-90 transition-opacity">
-                                            {order.orderNumber}
+                                            {order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}
                                         </span>
                                     </div>
 
@@ -358,7 +403,7 @@ const WorkingProcess = () => {
                                         }`}
                                 >
                                     <div className="flex justify-between items-start mb-2">
-                                        <h3 className={`font-black text-md ${selectedOrder?._id === order._id ? 'text-inherit' : 'text-[var(--theme-text-main)]'}`}>{order.orderNumber}</h3>
+                                        <h3 className={`font-black text-md ${selectedOrder?._id === order._id ? 'text-inherit' : 'text-[var(--theme-text-main)]'}`}>{order.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(order.orderNumber).startsWith('ORD-') ? String(order.orderNumber).replace('ORD-', '') : order.orderNumber}</h3>
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-black border border-current ${selectedOrder?._id === order._id ? 'bg-white text-black' : getStatusColor(order.orderStatus)}`}>
                                             {order.orderStatus}
                                         </span>
@@ -407,9 +452,7 @@ const WorkingProcess = () => {
                                     <div id="printable-kot" className="w-full bg-white text-black p-8 shadow-2xl relative rounded-3xl border border-gray-100 isolate overflow-hidden mb-4">
                                         {/* Dynamic Watermark Status */}
                                         <div className="absolute inset-x-0 top-0 h-2 bg-black/5" />
-                                        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none overflow-hidden -z-10">
-                                            <h1 className="text-[100px] font-black uppercase rotate-45 select-none">{selectedOrder.orderStatus}</h1>
-                                        </div>
+                                        {/* Watermark removed */}
 
                                         {/* KOT Header */}
                                         <div className="text-center border-b-2 border-dashed border-gray-300 pb-5 mb-5 relative z-10">
@@ -422,7 +465,9 @@ const WorkingProcess = () => {
                                         {/* Meta Data - Compact */}
                                         <div className="flex justify-between text-[10px] mb-4 relative z-10 pb-3 border-b border-gray-100">
                                             <div className="text-left space-y-0.5">
-                                                <p><span className="font-extrabold opacity-40 uppercase text-[8px]">ID:</span> <span className="font-bold">{selectedOrder.orderNumber}</span></p>
+                                                <p><span className="font-extrabold opacity-40 uppercase text-[8px]">ID:</span> <span className="font-bold">
+                                                    {selectedOrder.orderType === 'dine-in' ? 'DI' : 'TK'}-{String(selectedOrder.orderNumber).startsWith('ORD-') ? String(selectedOrder.orderNumber).replace('ORD-', '') : selectedOrder.orderNumber}
+                                                </span></p>
                                                 <p><span className="font-extrabold opacity-40 uppercase text-[8px]">Time:</span> <span className="font-bold">{new Date(selectedOrder.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></p>
                                             </div>
                                             <div className="text-right flex flex-col items-end">

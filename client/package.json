@@ -12,6 +12,7 @@
   "dependencies": {
     "@xenova/transformers": "^2.17.2",
     "axios": "^1.13.5",
+    "dexie": "^4.4.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.0",
     "lucide-react": "^0.574.0",

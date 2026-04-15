@@ -2,7 +2,7 @@ import { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, CheckCircle, Eye, EyeOff, Loader2, ChevronLeft, X } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+const logoImg = '/logo.png';
 import HeroSection from '../components/HeroSection';
 
 // Helper: get dashboard path by role
@@ -60,11 +60,11 @@ const Login = () => {
     if (transitioning) {
         const ORBIT_DOTS = [
             { angle: 0,   size: 7, speed: '3s',  opacity: 1,    color: '#FF6B35' },
-            { angle: 60,  size: 5, speed: '3s',  opacity: 0.7,  color: '#ff9f6b' },
+            { angle: 60,  size: 5, speed: '3s',  opacity: 0.7,  color: '#FFD700' },
             { angle: 120, size: 8, speed: '3s',  opacity: 0.9,  color: '#dc2626' },
-            { angle: 180, size: 4, speed: '3s',  opacity: 0.5,  color: '#FF6B35' },
-            { angle: 240, size: 6, speed: '3s',  opacity: 0.8,  color: '#ff9f6b' },
-            { angle: 300, size: 5, speed: '3s',  opacity: 0.6,  color: '#dc2626' },
+            { angle: 180, size: 4, speed: '3s',  opacity: 0.5,  color: '#FFD700' },
+            { angle: 240, size: 6, speed: '3s',  opacity: 0.8,  color: '#FF6B35' },
+            { angle: 300, size: 5, speed: '3s',  opacity: 0.6,  color: '#FFD700' },
         ];
         return (
             <>
@@ -234,7 +234,7 @@ const Login = () => {
                     <div style={{
                         position:'relative', zIndex:2,
                         width:'88px', height:'88px', borderRadius:'50%',
-                        background:'radial-gradient(circle at 38% 32%, #ff9a5c, #FF6B35 45%, #c62828)',
+                        background:'radial-gradient(circle at 38% 32%, #FFD700, #FF6B35 45%, #c62828)',
                         animation:'kz-orb-glow 2s ease-in-out infinite',
                         display:'flex', alignItems:'center', justifyContent:'center',
                     }}>
@@ -258,7 +258,7 @@ const Login = () => {
                         <h2 style={{
                             margin:0, fontSize:'26px', fontWeight:900,
                             textTransform:'uppercase',
-                            background:'linear-gradient(90deg,#ff6b35 0%,#fff 30%,#FF6B35 50%,#fff 70%,#ff6b35 100%)',
+                            background:'linear-gradient(90deg, #FF6B35 0%, #FFD700 30%, #FF6B35 50%, #FFD700 70%, #FF6B35 100%)',
                             backgroundSize:'400% auto',
                             WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
                             animation:'kz-shimmer 2.4s linear infinite, kz-title-in .7s .2s ease both',
@@ -270,7 +270,7 @@ const Login = () => {
                             color:'rgba(255,255,255,0.55)', letterSpacing:'.18em',
                             textTransform:'uppercase',
                             animation:'kz-sub-in .6s .5s ease both',
-                        }}>Smart Kitchen System</p>
+                        }}>{settings?.restaurantName || 'Smart Kitchen System'}</p>
 
                         {/* Bouncing dots */}
                         <div style={{ display:'flex', gap:'7px', justifyContent:'center', marginTop:'18px' }}>
@@ -328,7 +328,7 @@ const Login = () => {
 
     /* ── Show hero only ── */
     if (heroVisible) {
-        return <HeroSection onSignIn={handleSignIn} />;
+        return <HeroSection onSignIn={handleSignIn} settings={settings} />;
     }
 
     return (
@@ -343,7 +343,7 @@ const Login = () => {
                     style={{ backgroundImage: 'url("/login.jpeg")' }}
                 ></div>
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-950/60 via-slate-950/40 to-slate-950/80 backdrop-blur-sm"></div>
-                <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
+
             </div>
 
             {/* System Status - Top Right Pin (Hidden on mobile to avoid overlap) */}
@@ -359,22 +359,22 @@ const Login = () => {
             {/* Main Content (Centered) */}
             <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 sm:py-12 z-10 w-full relative min-h-dynamic-screen">
                 {/* Top Left Logo Section - Premium Entrance & Float */}
-                <div className="fixed top-6 left-6 z-[100] flex items-center gap-3 sm:gap-4 animate-blur-in hover:scale-105 transition-transform duration-500">
-                    <div className="flex items-center gap-3 sm:gap-4 group cursor-default">
+                <div className="fixed top-4 left-4 sm:top-6 sm:left-6 z-[100] flex items-center gap-2 sm:gap-4 animate-blur-in hover:scale-105 transition-transform duration-500">
+                    <div className="flex items-center gap-2 sm:gap-4 group cursor-default">
                         <div className="relative animate-float shadow-2xl">
-                            <div className="absolute -inset-1.5 bg-gradient-to-r from-orange-500/30 to-blue-500/30 rounded-2xl blur-lg opacity-40 group-hover:opacity-100 animate-pulse transition duration-500"></div>
-                            <div className="relative w-10 sm:w-11 h-10 sm:h-11 flex items-center justify-center rounded-xl bg-slate-900/60 backdrop-blur-xl p-1.5 border border-white/20 overflow-hidden shadow-orange-500/20">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/30 to-purple-500/30 rounded-xl blur-lg opacity-40 group-hover:opacity-100 animate-pulse transition duration-500"></div>
+                            <div className="relative w-8 sm:w-11 h-8 sm:h-11 flex items-center justify-center rounded-lg sm:rounded-xl bg-slate-900/60 backdrop-blur-xl p-1 sm:p-1.5 border border-white/20 overflow-hidden shadow-orange-500/20">
                                 <img src={logoImg} alt="KAGZSO" className="w-[85%] h-[85%] object-contain animate-inner-shimmer" />
                             </div>
                         </div>
                         <div className="flex flex-col animate-fade-in-right animation-delay-300">
-                            <h1 className="text-xl sm:text-2xl font-[1000] text-[#FFFFFF] tracking-[0.2em] uppercase leading-none drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">{settings?.restaurantName || 'KAGZSO'}</h1>
-                            <div className="h-px w-full bg-gradient-to-r from-orange-500/60 via-blue-500/60 to-transparent mt-2 rounded-full overflow-hidden">
+                            <h1 className="text-lg sm:text-2xl font-[1000] tracking-[0.2em] uppercase leading-none drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] bg-gradient-to-r from-yellow-400 via-white to-blue-500 bg-clip-text text-transparent bg-[length:200%_auto] animate-shimmer-sweep">KAGZSO</h1>
+                            <div className="h-[0.5px] sm:h-px w-full bg-gradient-to-r from-yellow-500/60 via-blue-500/60 to-transparent mt-1.5 rounded-full overflow-hidden">
                                 <div className="h-full w-full bg-white/40 animate-progress-glow"></div>
                             </div>
-                            <p className="text-[8px] text-white/50 font-black tracking-[0.3em] uppercase mt-2 leading-none flex items-center gap-2">
-                                <span className="w-1 h-1 rounded-full bg-orange-500 animate-ping"></span>
-                                Smart Kitchen System
+                            <p className="text-[7.5px] sm:text-[10px] text-white font-black tracking-[0.1em] uppercase mt-1.5 leading-none flex items-center gap-1.5">
+                                <span className="w-1 h-1 rounded-full bg-yellow-500 animate-ping"></span>
+                                {settings?.restaurantName || 'Smart Kitchen System'}
                             </p>
                         </div>
                     </div>

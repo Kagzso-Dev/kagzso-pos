@@ -1,4 +1,4 @@
-import { useContext, useState, useMemo, useCallback, useRef } from 'react';
+import { useContext, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import api from '../api';
 import { AuthContext } from '../context/AuthContext';
 import { CalendarPlus, X, ChevronDown, Pencil, Check } from 'lucide-react';
@@ -12,7 +12,7 @@ const saveZones = (z) => { try { localStorage.setItem(ZONE_KEY, JSON.stringify(z
 
 const TableGrid = ({
     onSelectTable,
-    allowedStatuses = ['available'],
+    allowedStatuses = ['available', 'occupied', 'cleaning'],
     filterByAllowedStatuses = false,
     showCleanAction = false,
     onReserve,
@@ -20,6 +20,15 @@ const TableGrid = ({
 }) => {
     const { tables, setTables } = useTablesData();
     const { user } = useContext(AuthContext);
+
+    // ── Sidebar collapse state ─────────────────────────────────────────────────
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+
+    useEffect(() => {
+        const handler = (e) => setSidebarCollapsed(e.detail?.collapsed ?? true);
+        window.addEventListener('sidebar-toggle', handler);
+        return () => window.removeEventListener('sidebar-toggle', handler);
+    }, []);
 
     // ── Zone state ────────────────────────────────────────────────────────────
     const [zones, setZones] = useState(loadZones);          // { tableId: zoneName }
@@ -76,17 +85,9 @@ const TableGrid = ({
     }, []);
 
     // ── Table action handlers ─────────────────────────────────────────────────
-    const handleTableClick = useCallback(async (table) => {
-        if (table.status === 'available' && user.role === 'waiter') {
-            try {
-                const res = await api.put(`/api/tables/${table._id}/reserve`, {}, { headers: { Authorization: `Bearer ${user.token}` } });
-                setTables(prev => prev.map(t => t._id === table._id ? res.data : t));
-                onSelectTable?.(res.data);
-            } catch (err) { alert(err.response?.data?.message || 'Failed to reserve table'); }
-            return;
-        }
+    const handleTableClick = useCallback((table) => {
         if (allowedStatuses.includes(table.status)) onSelectTable?.(table);
-    }, [user, allowedStatuses, onSelectTable, setTables]);
+    }, [allowedStatuses, onSelectTable]);
 
     const handleCleanTable = useCallback(async (e, table) => {
         e.stopPropagation();
@@ -121,24 +122,7 @@ const TableGrid = ({
     };
 
     const getActions = (table) => {
-        if (onReserve === undefined && onCancelReservation === undefined) return null;
-        if (table.status !== 'available' && table.status !== 'reserved') return null;
-        return (
-            <>
-                {table.status === 'available' && (
-                    <span role="button" onClick={(e) => handleReserveClick(e, table)} title="Reserve"
-                        className="w-6 h-6 flex items-center justify-center bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-full transition-all border border-emerald-500/30 cursor-pointer">
-                        <CalendarPlus size={11} />
-                    </span>
-                )}
-                {table.status === 'reserved' && (
-                    <span role="button" onClick={(e) => handleCancelReservation(e, table)} title="Cancel Reservation"
-                        className="w-6 h-6 flex items-center justify-center bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded-full transition-all border border-red-500/30 cursor-pointer">
-                        <X size={11} />
-                    </span>
-                )}
-            </>
-        );
+        return null;
     };
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -204,7 +188,7 @@ const TableGrid = ({
                             <p className="text-sm font-semibold text-gray-700 mb-3">{zoneName}</p>
 
                             {/* Table cards row: Responsive Grid — Now 2 columns on Mobile */}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                            <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 ${sidebarCollapsed ? 'lg:grid-cols-6 xl:grid-cols-7' : 'lg:grid-cols-5 xl:grid-cols-6'} gap-3`}>
                                 {zoneTables.map(table => {
                                     const clickable = isClickable(table);
                                     return (
@@ -221,9 +205,9 @@ const TableGrid = ({
                                             {showCleanAction && table.status === 'cleaning' && (
                                                 <button 
                                                     onClick={(e) => handleCleanTable(e, table)}
-                                                    className="w-full py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-[0_4px_12px_rgba(16,185,129,0.2)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.3)] flex items-center justify-center gap-1.5"
+                                                    className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] text-white text-base font-bold uppercase rounded-xl transition-all shadow-[0_4px_12px_rgba(16,185,129,0.2)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2"
                                                 >
-                                                    <Check size={10} strokeWidth={4} />
+                                                    <Check size={18} strokeWidth={4} />
                                                     Clean
                                                 </button>
                                             )}

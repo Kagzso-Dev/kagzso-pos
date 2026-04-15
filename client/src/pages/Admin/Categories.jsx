@@ -4,6 +4,8 @@ import { AuthContext } from '../../context/AuthContext';
 import { Trash2, Plus, Edit2, Upload, X } from 'lucide-react';
 import ViewToggle from '../../components/ViewToggle';
 import OptimizedImage from '../../components/OptimizedImage';
+import { getCategories, saveCategories } from '../../db/db';
+import { queueAction } from '../../utils/syncEngine';
 
 const AdminCategories = () => {
     const [categories, setCategories] = useState([]);
@@ -72,35 +74,62 @@ const AdminCategories = () => {
     };
 
     const fetchCategories = async () => {
+        console.log('[AdminCategories] Fetching categories from API...');
+        if (!navigator.onLine) {
+            console.warn('[AdminCategories] Device is offline. Loading categories from IndexedDB.');
+            const cached = await getCategories();
+            setCategories(cached || []);
+            return;
+        }
         try {
             const res = await api.get('/api/categories');
-            setCategories(res.data);
+            console.log('[AdminCategories] API Response:', res.data);
+            
+            if (!res.data || res.data.length === 0) {
+                console.warn('[AdminCategories] API returned empty categories list.');
+            }
+            
+            setCategories(res.data || []);
+            await saveCategories(res.data || []);
         } catch (error) {
-            console.error("Error fetching categories", error);
+            console.error("[AdminCategories] Error fetching categories:", error);
+            const cached = await getCategories();
+            setCategories(cached || []);
         }
     };
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this category? This will fail if any menu items are assigned to it.')) return;
         try {
+            if (!navigator.onLine) {
+                const action = { type: 'category', method: 'DELETE', endpoint: `/api/categories/${id}` };
+                await queueAction(action);
+                setCategories(prev => prev.filter(c => String(c._id) !== String(id)));
+                alert('Category will be deleted when online.');
+                return;
+            }
             await api.delete(`/api/categories/${id}`, {
                 headers: { Authorization: `Bearer ${user.token}` },
             });
-            // Socket event will update state; also remove optimistically
             setCategories(prev => prev.filter(c => String(c._id) !== String(id)));
         } catch (error) {
             alert(error.response?.data?.message || 'Failed to delete category');
         }
     };
 
-    // Quick toggle status without opening modal
     const handleToggleStatus = async (cat) => {
         const newStatus = cat.status === 'active' ? 'inactive' : 'active';
         try {
+            if (!navigator.onLine) {
+                const action = { type: 'category', method: 'PUT', endpoint: `/api/categories/${cat._id}`, data: { status: newStatus } };
+                await queueAction(action);
+                setCategories(prev => prev.map(c => c._id === cat._id ? { ...c, status: newStatus } : c));
+                alert('Status will be updated when online.');
+                return;
+            }
             await api.put(`/api/categories/${cat._id}`, { status: newStatus }, {
                 headers: { Authorization: `Bearer ${user.token}` },
             });
-            // Socket event 'category-updated' will update the state
         } catch (error) {
             alert(error.response?.data?.message || 'Failed to update status');
         }
@@ -111,11 +140,29 @@ const AdminCategories = () => {
         setFormError('');
         try {
             if (editingCategory) {
+                if (!navigator.onLine) {
+                    const action = { type: 'category', method: 'PUT', endpoint: `/api/categories/${editingCategory._id}`, data: formData };
+                    await queueAction(action);
+                    setCategories(prev => prev.map(c => c._id === editingCategory._id ? { ...c, ...formData } : c));
+                    alert('Category will be updated when online.');
+                    closeModal();
+                    return;
+                }
                 const res = await api.put(`/api/categories/${editingCategory._id}`, formData, {
                     headers: { Authorization: `Bearer ${user.token}` },
                 });
                 setCategories(prev => prev.map(c => c._id === editingCategory._id ? res.data : c));
             } else {
+                if (!navigator.onLine) {
+                    const localId = `local_cat_${Date.now()}`;
+                    const newCat = { ...formData, _id: localId };
+                    setCategories(prev => [...prev, newCat]);
+                    const action = { type: 'category', method: 'POST', endpoint: '/api/categories', data: formData };
+                    await queueAction(action);
+                    alert('Category will be created when online.');
+                    closeModal();
+                    return;
+                }
                 const res = await api.post('/api/categories', formData, {
                     headers: { Authorization: `Bearer ${user.token}` },
                 });

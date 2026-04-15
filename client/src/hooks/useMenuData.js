@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api';
+import { saveMenus, getMenus, saveCategories, getCategories } from '../db/db';
 
 const DEFAULT_CATEGORY_IMAGES = {
     'Starters': '/images/starters.png',
@@ -9,121 +10,144 @@ const DEFAULT_CATEGORY_IMAGES = {
 };
 const DEFAULT_FOOD_IMAGE = '/images/main-course.png';
 
-// ── Module-level cache (persists across route navigations) ────────────────
-const _cache = {
+const CACHE_TTL = 5 * 60 * 1000;
+let _cache = {
     items: null,
     categories: null,
     fetchedAt: 0,
 };
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-let _pendingFetch = null; // Deduplicate concurrent fetches
+let _pendingFetch = null;
 
-/**
- * useMenuData
- *
- * Shared hook for fetching menu items + categories with an in-memory cache.
- * Returns cached data instantly on repeat visits (no loading spinner).
- * Keeps data fresh via socket events in real-time.
- *
- * Used by: Waiter/DineIn, Waiter/TakeAway
- */
+const applyDefaultImages = (items) => {
+    return items.map(item => {
+        if (!item.image || item.image.trim() === '') {
+            const catName = item.category?.name?.trim() || '';
+            item.image = DEFAULT_CATEGORY_IMAGES[catName] || DEFAULT_FOOD_IMAGE;
+        }
+        return item;
+    });
+};
+
 const useMenuData = () => {
     const { socket } = useContext(AuthContext);
 
     const isCacheFresh =
         _cache.items !== null && Date.now() - _cache.fetchedAt < CACHE_TTL;
 
-    const [menuItems, setMenuItems] = useState(_cache.items || []);
-    const [categories, setCategories] = useState(_cache.categories || []);
+    const [menuItems, setMenuItems] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(!isCacheFresh);
 
-    // ── Initial fetch (skipped when cache is fresh) ──────────────────────
-    useEffect(() => {
-        if (isCacheFresh) return;
-
-        let mounted = true;
-
-        if (!_pendingFetch) {
-            _pendingFetch = Promise.all([
-                api.get('/api/menu'),
-                api.get('/api/categories'),
-            ])
-                .then(([menuRes, catRes]) => {
-                    _cache.categories = catRes.data;
-                    
-                    // Apply code-level default fallback images to menu items if missing
-                    _cache.items = menuRes.data.map(item => {
-                        if (!item.image || item.image.trim() === '') {
-                            const catName = item.category?.name?.trim() || '';
-                            item.image = DEFAULT_CATEGORY_IMAGES[catName] || DEFAULT_FOOD_IMAGE;
-                        }
-                        return item;
-                    });
-                    
-                    _cache.fetchedAt = Date.now();
-                })
-                .catch(err => {
-                    console.error('useMenuData:', err);
-                    if (!_cache.items) _cache.items = [];
-                    if (!_cache.categories) _cache.categories = [];
-                })
-                .finally(() => {
-                    _pendingFetch = null;
-                });
-        }
-
-        _pendingFetch.then(() => {
-            if (!mounted) return;
+    const loadFromIndexedDB = async () => {
+        const [cachedItems, cachedCategories] = await Promise.all([
+            getMenus(),
+            getCategories(),
+        ]);
+        if (cachedItems.length > 0) {
+            _cache.items = applyDefaultImages(cachedItems);
+            _cache.categories = cachedCategories;
+            _cache.fetchedAt = Date.now();
             setMenuItems([..._cache.items]);
             setCategories([..._cache.categories]);
-            setLoading(false);
-        });
+            return true;
+        }
+        return false;
+    };
 
-        return () => {
-            mounted = false;
+    useEffect(() => {
+        const init = async () => {
+            if (isCacheFresh) {
+                setMenuItems([...(_cache.items || [])]);
+                setCategories([...(_cache.categories || [])]);
+                setLoading(false);
+                return;
+            }
+
+            if (navigator.onLine) {
+                let mounted = true;
+                if (!_pendingFetch) {
+                    _pendingFetch = Promise.all([
+                        api.get('/api/menu'),
+                        api.get('/api/categories'),
+                    ])
+                        .then(([menuRes, catRes]) => {
+                            console.log('useMenuData: API Response - Menu:', menuRes.data);
+                            console.log('useMenuData: API Response - Categories:', catRes.data);
+
+                            const items = applyDefaultImages(menuRes.data || []);
+                            const cats = catRes.data || [];
+                            
+                            if (cats.length === 0) {
+                                console.warn('useMenuData: No categories returned from API.');
+                            }
+
+                            _cache.items = items;
+                            _cache.categories = cats;
+                            _cache.fetchedAt = Date.now();
+
+                            saveMenus(items);
+                            saveCategories(cats);
+                        })
+                        .catch(err => {
+                            console.error('useMenuData: API Error:', err);
+                            // Optionally fallback to local DB if API fails
+                            loadFromIndexedDB();
+                        })
+                        .finally(() => {
+                            _pendingFetch = null;
+                        });
+                }
+
+                _pendingFetch.then(() => {
+                    if (!mounted) return;
+                    setMenuItems([...(_cache.items || [])]);
+                    setCategories([...(_cache.categories || [])]);
+                    setLoading(false);
+                });
+            } else {
+                const hasLocal = await loadFromIndexedDB();
+                if (!hasLocal) {
+                    _cache.items = [];
+                    _cache.categories = [];
+                }
+                setLoading(false);
+            }
         };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Real-time socket sync ────────────────────────────────────────────
+        init();
+    }, [isCacheFresh]);
+
     useEffect(() => {
         if (!socket) return;
 
         const onMenuUpdated = ({ action, item, id }) => {
             if (action === 'create' && item) {
-                if (item.availability) {
-                    if (!item.image || item.image.trim() === '') {
-                        const catName = item.category?.name?.trim() || '';
-                        item.image = DEFAULT_CATEGORY_IMAGES[catName] || DEFAULT_FOOD_IMAGE;
-                    }
-                    setMenuItems(prev => {
-                        if (prev.find(i => i._id === item._id)) return prev;
-                        const next = [...prev, item];
-                        _cache.items = next;
-                        return next;
-                    });
-                }
-            } else if (action === 'update' && item) {
-                if (!item.image || item.image.trim() === '') {
-                    const catName = item.category?.name?.trim() || '';
-                    item.image = DEFAULT_CATEGORY_IMAGES[catName] || DEFAULT_FOOD_IMAGE;
-                }
+                const processed = applyDefaultImages([item])[0];
                 setMenuItems(prev => {
-                    const exists = prev.find(i => i._id === item._id);
+                    if (prev.find(i => i._id === item._id)) return prev;
+                    const next = [...prev, processed];
+                    _cache.items = next;
+                    saveMenus(next);
+                    return next;
+                });
+            } else if (action === 'update' && item) {
+                const processed = applyDefaultImages([item])[0];
+                setMenuItems(prev => {
                     let next;
                     if (!item.availability) {
                         next = prev.filter(i => i._id !== item._id);
                     } else {
-                        next = exists
-                            ? prev.map(i => (i._id === item._id ? item : i))
-                            : [...prev, item];
+                        next = prev.map(i => (i._id === item._id ? processed : i));
                     }
                     _cache.items = next;
+                    saveMenus(next);
                     return next;
                 });
             } else if (action === 'delete' && id) {
                 setMenuItems(prev => {
                     const next = prev.filter(i => i._id !== id);
                     _cache.items = next;
+                    saveMenus(next);
                     return next;
                 });
             }
@@ -135,6 +159,7 @@ const useMenuData = () => {
                     if (prev.find(c => c._id === category._id)) return prev;
                     const next = [...prev, category];
                     _cache.categories = next;
+                    saveCategories(next);
                     return next;
                 });
             } else if (action === 'update' && category) {
@@ -143,12 +168,14 @@ const useMenuData = () => {
                         c._id === category._id ? category : c
                     );
                     _cache.categories = next;
+                    saveCategories(next);
                     return next;
                 });
             } else if (action === 'delete' && id) {
                 setCategories(prev => {
                     const next = prev.filter(c => c._id !== id);
                     _cache.categories = next;
+                    saveCategories(next);
                     return next;
                 });
             }

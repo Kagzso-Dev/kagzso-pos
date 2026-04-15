@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
 import api from '../api';
 import { AuthContext } from '../context/AuthContext';
+import { getTables, saveTables } from '../db/db';
 
 /**
  * useTablesData
@@ -19,15 +20,23 @@ export const useTablesData = () => {
 
     const fetchTables = useCallback(async () => {
         if (!user) return;
+        if (!navigator.onLine) {
+            const cached = await getTables();
+            setTables(cached || []);
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
             const res = await api.get('/api/tables', {
                 headers: { Authorization: `Bearer ${user.token}` },
             });
-            // Always ensure we have an array
             setTables(Array.isArray(res.data) ? res.data : []);
+            await saveTables(res.data);
         } catch (error) {
             console.error('[useTablesData] Failed to fetch tables:', error);
+            const cached = await getTables();
+            setTables(cached || []);
         } finally {
             setLoading(false);
         }

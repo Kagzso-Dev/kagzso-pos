@@ -24,8 +24,13 @@ const getBaseURL = () => {
         return `http://${hostname}:5005/api`;
     }
 
-    // 4. Default local development
-    return "http://localhost:5005/api";
+    // 4. Smart Local Development: If on localhost, use local backend
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return "http://localhost:5005/api";
+    }
+
+    // 5. Default VPS/Production URL as requested
+    return "http://139.84.152.58:5005/api";
 };
 
 const baseURL = getBaseURL().replace(/\/+$/, "");

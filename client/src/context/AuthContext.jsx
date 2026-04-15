@@ -2,17 +2,34 @@ import { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import api, { baseURL as API_BASE } from '../api';
 import { io } from 'socket.io-client';
 
-export const AuthContext = createContext();
+export const AuthContext = createContext({
+    user: null,
+    socket: null,
+    settings: {},
+    loading: true,
+    login: () => { },
+    logout: () => { },
+    fetchSettings: () => { },
+    formatPrice: (amount) => '',
+    role: null,
+    isAdmin: false,
+    socketConnected: false,
+    serverStatus: 'online',
+});
 
 // ── Auth Provider Component ──────────────────────────────────────────────────
 export const AuthProvider = ({ children }) => {
-    // ── Synchronous session restore ───────────────────────────────────────────
-    // Uses sessionStorage so each browser tab is fully independent —
-    // Tab 1 can be waiter, Tab 2 kitchen, Tab 3 admin simultaneously.
+    // ── Session restore ───────────────────────────────────────────────
+    // First try sessionStorage, then localStorage (for offline)
     const [user, setUser] = useState(() => {
         try {
-            const raw = sessionStorage.getItem('user');
-            return raw ? JSON.parse(raw) : null;
+            // Try sessionStorage first (online session)
+            let raw = sessionStorage.getItem('user');
+            if (raw) {
+                const u = JSON.parse(raw);
+                if (u?.token) return u;
+            }
+            return null;
         } catch {
             return null;
         }
@@ -24,7 +41,7 @@ export const AuthProvider = ({ children }) => {
     const [socketConnected, setSocketConnected] = useState(false);
     const [serverStatus, setServerStatus] = useState('online');
     const [settings, setSettings] = useState({
-        restaurantName: 'KAGZSO',
+        restaurantName: 'admin',
         address: '',
         currency: 'INR',
         currencySymbol: '₹',
@@ -51,13 +68,13 @@ export const AuthProvider = ({ children }) => {
             socketRef.current.disconnect();
             socketRef.current = null;
         }
-    
+
         const sUser = JSON.parse(sessionStorage.getItem('user') || 'null');
         const token = customToken || sUser?.token || user?.token;
-    
+
         const socketURL = import.meta.env.VITE_SOCKET_URL || API_BASE;
         const normalizedURL = socketURL.startsWith('http') ? socketURL : window.location.origin;
-    
+
         const newSocket = io(normalizedURL, {
             transports: ['websocket', 'polling'], // Prioritize websocket
             path: '/socket.io/',
@@ -71,17 +88,17 @@ export const AuthProvider = ({ children }) => {
             reconnectionDelayMax: 5000,
             timeout: 20000,
         });
-    
+
         const joinRooms = () => {
             newSocket.emit('join_branch');
             console.log('%c✅ Socket connected to restaurant main room', 'color: #10b981; font-weight: bold;');
-    
+
             if (role) {
                 newSocket.emit('join_role', role);
                 console.log('%c✅ Socket role-room joined:', 'color: #3b82f6; font-weight: bold;', `role_${role}`);
             }
         };
-    
+
         newSocket.on('connect', () => {
             setSocketConnected(true);
             setServerStatus('online');
@@ -89,7 +106,7 @@ export const AuthProvider = ({ children }) => {
             // Trigger background sync for all active dashboards
             window.dispatchEvent(new CustomEvent('pos-refresh'));
         });
-    
+
         newSocket.on('reconnect', (attempt) => {
             setSocketConnected(true);
             setServerStatus('online');
@@ -98,7 +115,7 @@ export const AuthProvider = ({ children }) => {
             // Ensure data consistency after reconnection
             window.dispatchEvent(new CustomEvent('pos-refresh'));
         });
-    
+
         newSocket.on('disconnect', (reason) => {
             setSocketConnected(false);
             if (reason === 'io server disconnect') {
@@ -108,13 +125,13 @@ export const AuthProvider = ({ children }) => {
                 console.warn(`⚠️ Socket disconnected: ${reason}`);
             }
         });
-    
+
         newSocket.on('connect_error', (err) => {
             setSocketConnected(false);
             setServerStatus('offline');
             console.error('❌ Socket connection error:', err.message);
         });
-    
+
         socketRef.current = newSocket;
         setSocket(newSocket);
         return newSocket;
@@ -156,8 +173,9 @@ export const AuthProvider = ({ children }) => {
 
         return () => {
             if (socketRef.current) {
-                socketRef.current.disconnect();
+                const s = socketRef.current;
                 socketRef.current = null;
+                if (s.connected) s.disconnect();
             }
         };
     }, [user, initSocket, fetchSettings]);
@@ -183,6 +201,7 @@ export const AuthProvider = ({ children }) => {
             setUser(userData);
             sessionStorage.setItem('user', JSON.stringify(userData));
 
+
             initSocket(userData.role, userData.token);
             fetchSettings();
 
@@ -199,6 +218,7 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setUser(null);
         sessionStorage.removeItem('user');
+
         if (socketRef.current) {
             socketRef.current.disconnect();
             socketRef.current = null;
@@ -206,7 +226,7 @@ export const AuthProvider = ({ children }) => {
         setSocket(null);
         setSocketConnected(false);
         setSettings({
-            restaurantName: 'KAGZSO',
+            restaurantName: 'admin',
             currency: 'INR',
             currencySymbol: '₹',
             sgst: 0,
@@ -219,7 +239,14 @@ export const AuthProvider = ({ children }) => {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     const formatPrice = (amount) => {
-        return `${settings.currencySymbol}${(amount || 0).toFixed(2)}`;
+        const value = amount || 0;
+        return `${settings.currencySymbol}${value % 1 === 0 ? value.toFixed(0) : value.toFixed(2)}`;
+    };
+
+    const formatOrderNumber = (order) => {
+        const num = order.orderNumber?.replace('ORD-', '') || order.orderNumber || '';
+        const prefix = order.orderType === 'takeaway' ? 'TK' : order.orderType === 'dine-in' ? 'DI' : 'ORD';
+        return `${prefix}-${num}`;
     };
 
     const role = user?.role || null;
@@ -237,6 +264,7 @@ export const AuthProvider = ({ children }) => {
             settings,
             fetchSettings,
             formatPrice,
+            formatOrderNumber,
             role,
             isAdmin,
         }}>

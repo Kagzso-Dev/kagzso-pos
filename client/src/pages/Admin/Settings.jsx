@@ -1,6 +1,8 @@
 import { useState, useEffect, useContext } from 'react';
 import api from '../../api';
 import { AuthContext } from '../../context/AuthContext';
+import { queueAction } from '../../utils/syncEngine';
+import { saveSetting } from '../../db/db';
 import {
     Save, Lock, CheckCircle2, AlertCircle,
     QrCode, Upload, Camera, Loader2, Eye, EyeOff,
@@ -226,7 +228,7 @@ const Settings = () => {
     useEffect(() => {
         if (settings) {
             setQrUrls({
-                standardQrUrl:  settings.standardQrUrl  || null,
+                standardQrUrl: settings.standardQrUrl || null,
                 secondaryQrUrl: settings.secondaryQrUrl || null,
             });
         }
@@ -249,10 +251,18 @@ const Settings = () => {
         if (e) e.preventDefault();
         setLoading(true);
         try {
+            if (!navigator.onLine) {
+                const action = { type: 'settings', method: 'PUT', endpoint: '/api/settings', data: generalConfig };
+                await queueAction(action);
+                await saveSetting('generalConfig', generalConfig);
+                setMsg(key, 'success', 'Saved offline - will sync when online');
+                setLoading(false);
+                return;
+            }
             await api.put('/api/settings', generalConfig, { headers: { Authorization: `Bearer ${user.token}` } });
-            // Update context state immediately from response
-            if (fetchSettings) await fetchSettings(); 
-            setMsg(key, 'success', 'Saved successfully');
+            await saveSetting('generalConfig', generalConfig);
+            if (fetchSettings) await fetchSettings();
+            setMsg(key, 'success', 'Saved');
         } catch (err) {
             setMsg(key, 'error', err.response?.data?.message || 'Save failed');
         }
@@ -293,6 +303,49 @@ const Settings = () => {
                 <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">Manage restaurant configuration</p>
             </div>
 
+            {/* Feature Toggles - Hidden as requested
+            <Card>
+                <SectionHeader icon={Shield} title="Order Types" color="orange" />
+                <div className="p-5 space-y-4">
+                    <div className="flex items-center justify-between py-2 border-b border-[var(--theme-border)]">
+                        <div>
+                            <p className="text-sm font-semibold text-[var(--theme-text-main)]">Dine-In Orders</p>
+                            <p className="text-xs text-[var(--theme-text-muted)]">Table-based dine-in orders</p>
+                        </div>
+                        <button type="button" onClick={() => setGeneralConfig(p => ({ ...p, dineInEnabled: !p.dineInEnabled }))}>
+                            {generalConfig.dineInEnabled ? <ToggleRight size={24} className="text-green-500" /> : <ToggleLeft size={24} className="text-gray-400" />}
+                        </button>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-[var(--theme-border)]">
+                        <div>
+                            <p className="text-sm font-semibold text-[var(--theme-text-main)]">Takeaway Orders</p>
+                            <p className="text-xs text-[var(--theme-text-muted)]">Token-based takeaway orders</p>
+                        </div>
+                        <button type="button" onClick={() => setGeneralConfig(p => ({ ...p, takeawayEnabled: !p.takeawayEnabled }))}>
+                            {generalConfig.takeawayEnabled ? <ToggleRight size={24} className="text-green-500" /> : <ToggleLeft size={24} className="text-gray-400" />}
+                        </button>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                        <div>
+                            <p className="text-sm font-semibold text-[var(--theme-text-main)]">Table Map</p>
+                            <p className="text-xs text-[var(--theme-text-muted)]">Show table layout in waiter</p>
+                        </div>
+                        <button type="button" onClick={() => setGeneralConfig(p => ({ ...p, tableMapEnabled: !p.tableMapEnabled }))}>
+                            {generalConfig.tableMapEnabled ? <ToggleRight size={24} className="text-green-500" /> : <ToggleLeft size={24} className="text-gray-400" />}
+                        </button>
+                    </div>
+                    <div className="pt-3 border-t border-[var(--theme-border)] flex items-center gap-3">
+                        <button type="button" onClick={e => saveConfig(e, 'features')} disabled={loading}
+                            className="h-10 px-6 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-orange-600/20 disabled:opacity-50 flex items-center gap-2">
+                            {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                            Save Features
+                        </button>
+                        <Notice msg={msgs['features']} />
+                    </div>
+                </div>
+            </Card>
+            */}
+
             {/* Business Info */}
             <Card>
                 <SectionHeader icon={Building2} title="Business Information" color="blue" />
@@ -311,6 +364,9 @@ const Settings = () => {
                                 <option value="EUR">EUR (€)</option>
                             </select>
                         </Field>
+                        <Field label="Currency Symbol">
+                            <input type="text" name="currencySymbol" value={generalConfig.currencySymbol} onChange={handleChange} maxLength={3} className={inputCls} />
+                        </Field>
                         <Field label="GST / VAT No.">
                             <input type="text" name="gstNumber" value={generalConfig.gstNumber} onChange={handleChange} className={inputCls} />
                         </Field>
@@ -325,7 +381,7 @@ const Settings = () => {
                     </div>
 
                     {/* Cashier Payment Offer */}
-                    <div className="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 overflow-hidden">
+                    {/* <div className="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/5 overflow-hidden">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-amber-200 dark:border-amber-500/20">
                             <div className="flex items-center gap-2">
                                 <Tag size={15} className="text-amber-500" />
@@ -367,7 +423,7 @@ const Settings = () => {
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </div> */}
 
                     <Footer section="general" color="blue" label="Save Business Details" msgs={msgs} loading={loading} />
                 </form>
@@ -454,11 +510,10 @@ const Settings = () => {
                         ].map(opt => (
                             <button key={opt.id} type="button"
                                 onClick={() => setGeneralConfig({ ...generalConfig, dashboardView: opt.id })}
-                                className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${
-                                    generalConfig.dashboardView === opt.id
+                                className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${generalConfig.dashboardView === opt.id
                                         ? 'bg-orange-500 text-white shadow-md'
                                         : 'text-[var(--theme-text-muted)] hover:bg-[var(--theme-bg-hover)]'
-                                }`}>
+                                    }`}>
                                 <opt.icon size={16} />
                                 {opt.label}
                             </button>
@@ -488,11 +543,10 @@ const Settings = () => {
                         ].map(opt => (
                             <button key={opt.id} type="button"
                                 onClick={() => setGeneralConfig({ ...generalConfig, menuView: opt.id })}
-                                className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${
-                                    generalConfig.menuView === opt.id
+                                className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${generalConfig.menuView === opt.id
                                         ? 'bg-violet-600 text-white shadow-md'
                                         : 'text-[var(--theme-text-muted)] hover:bg-[var(--theme-bg-hover)]'
-                                }`}>
+                                    }`}>
                                 <opt.icon size={16} />
                                 {opt.label}
                             </button>
@@ -527,11 +581,10 @@ const Settings = () => {
                             ].map(opt => (
                                 <button key={opt.id} type="button"
                                     onClick={() => setGeneralConfig({ ...generalConfig, mobileMenuView: opt.id })}
-                                    className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${
-                                        generalConfig.mobileMenuView === opt.id
+                                    className={`flex items-center justify-center gap-2 h-11 rounded-lg text-xs font-semibold transition-all ${generalConfig.mobileMenuView === opt.id
                                             ? 'bg-rose-600 text-white shadow-md'
                                             : 'text-[var(--theme-text-muted)] hover:bg-[var(--theme-bg-hover)]'
-                                    }`}>
+                                        }`}>
                                     <opt.icon size={16} />
                                     {opt.label}
                                 </button>
