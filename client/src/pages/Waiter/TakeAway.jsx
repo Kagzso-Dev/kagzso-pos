@@ -86,7 +86,11 @@ const TakeAway = () => {
             }
         };
         socket.on('menu-updated', onMenuUpdated);
-        return () => socket.off('menu-updated', onMenuUpdated);
+        socket.on('itemUpdated', onMenuUpdated);
+        return () => {
+            socket.off('menu-updated', onMenuUpdated);
+            socket.off('itemUpdated', onMenuUpdated);
+        };
     }, [socket]);
 
     const addToCart = useCallback((item, variant = null) => {
@@ -380,12 +384,12 @@ const TakeAway = () => {
                 <aside className={`
                     fixed inset-0 z-[100] md:relative md:inset-auto md:z-0 flex-shrink-0 md:self-start
                     transition-all duration-300 ease-in-out overflow-hidden
-                    ${(isCartOpen && cart.length > 0)
+                    ${isCartOpen
                         ? 'translate-x-0 w-full md:w-[320px] lg:w-[380px] xl:w-[420px]'
                         : 'translate-x-full md:translate-x-0 w-full md:w-0'
                     }
                 `}>
-                    {(isCartOpen && cart.length > 0) && <div onClick={() => setIsCartOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" />}
+                    {isCartOpen && <div onClick={() => setIsCartOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" />}
 
 
                     <div className="relative h-full md:h-auto md:max-h-[calc(100dvh-2rem)] w-full max-w-[400px] ml-auto md:ml-0 bg-[var(--theme-bg-card)] rounded-t-3xl md:rounded-3xl border-l md:border border-[var(--theme-border)] shadow-2xl flex flex-col pb-[64px] md:pb-0">
@@ -406,12 +410,19 @@ const TakeAway = () => {
                         </div>
 
                         {/* Scrollable items */}
-                        <div className="flex-1 kot-scroll px-4 py-4 space-y-3 custom-scrollbar">
+                        <div className="flex-1 kot-scroll px-4 py-4 space-y-3 custom-scrollbar flex flex-col">
                             {cart.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center text-[var(--theme-text-muted)] py-10">
-                                    <ShoppingCart size={64} className="mb-4 opacity-5" strokeWidth={1} />
-                                    <p className="font-bold">Your cart is empty</p>
-                                    <p className="text-xs">Add items from the menu to build your order</p>
+                                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 animate-fade-in bg-blue-500/5 m-2 rounded-[2rem] border-2 border-dashed border-blue-500/20">
+                                    <div className="w-20 h-20 rounded-full bg-[var(--theme-bg-dark)] flex items-center justify-center mb-5 border border-[var(--theme-border)] shadow-xl relative">
+                                        <ShoppingCart size={28} className="text-blue-400 opacity-20" />
+                                        <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-lg">
+                                            <Plus size={14} strokeWidth={3} />
+                                        </div>
+                                    </div>
+                                    <h3 className="text-md font-black text-[var(--theme-text-main)] uppercase tracking-tight mb-1">Cart is empty</h3>
+                                    <p className="text-[10px] text-[var(--theme-text-muted)] max-w-[180px] font-bold leading-relaxed opacity-60">
+                                        Select items from the menu to build your takeaway order.
+                                    </p>
                                 </div>
                             ) : (
                                 cart.map(item => (
@@ -587,6 +598,48 @@ const TakeAway = () => {
                 </div>,
                 document.body
             )}
+            
+            {/* ── Mobile Floating Cart Bar ── */}
+            <FloatingCartBar 
+                cart={cart} 
+                isCartOpen={isCartOpen} 
+                setIsCartOpen={setIsCartOpen} 
+                formatPrice={formatPrice}
+                finalAmount={finalAmount}
+            />
+        </div>
+    );
+};
+
+/* ── Mobile Floating Cart Bar (Same as DineIn for consistency) ── */
+const FloatingCartBar = ({ cart, isCartOpen, setIsCartOpen, formatPrice, finalAmount }) => {
+    if (isCartOpen) return null;
+    return (
+        <div className="md:hidden fixed bottom-6 left-4 right-4 z-[90] animate-in slide-in-from-bottom-10 fade-in duration-500">
+            <button
+                onClick={() => setIsCartOpen(true)}
+                className="w-full h-14 bg-gray-900 text-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.3)] flex items-center justify-between px-5 active:scale-[0.98] transition-all overflow-hidden relative group"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <ShoppingCart size={20} className="text-blue-400" />
+                        {cart.length > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center text-[9px] font-black border border-gray-900">
+                                {cart.length}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex flex-col items-start leading-tight">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">View Cart</span>
+                        <span className="text-sm font-black">{formatPrice(finalAmount)}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-black uppercase tracking-[0.1em]">Place Order</span>
+                    <ChevronLeft size={16} strokeWidth={3} className="text-blue-400 rotate-180" />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            </button>
         </div>
     );
 };

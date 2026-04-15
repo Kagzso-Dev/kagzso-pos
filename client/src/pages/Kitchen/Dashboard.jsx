@@ -162,7 +162,7 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
             {/* ── Items ─────────────────────────────────────────────────── */}
             <div className="flex-1 px-3 py-2.5 space-y-2 overflow-y-auto custom-scrollbar min-h-[60px] max-h-[220px]">
                 {/* ITEMS LIST (Active & Cancelled) */}
-                {order.items.filter(i => i.status?.toUpperCase() !== 'READY').map(item => {
+                {(order.items || []).filter(i => i.status?.toUpperCase() !== 'READY').map(item => {
                     const isCancelled = item.status?.toUpperCase() === 'CANCELLED';
                     return (
                         <div key={item._id} className="flex flex-col gap-0.5">
@@ -195,7 +195,7 @@ const KotTicket = ({ order, onUpdateStatus, onUpdateItemStatus, onCancel, onCanc
                 })}
 
                 {/* COMPLETED ITEMS (Streamlined) */}
-                {order.items.some(i => i.status?.toUpperCase() === 'READY') && (
+                {(order.items || []).some(i => i.status?.toUpperCase() === 'READY') && (
                     <div className="mt-2 pt-2 border-t border-dashed border-[var(--theme-border)] opacity-60">
                         <p className="text-[8px] font-black text-emerald-600 mb-1.5 tracking-widest uppercase">✓ Completed</p>
                         <div className="space-y-1">
@@ -447,19 +447,39 @@ const KitchenDashboard = () => {
             };
 
             const onNewOrder = (order) => {
+                // Defensive: ensure status is relevant for kitchen
+                if (!order || !order.orderStatus) return;
+
                 setOrders(prev => {
                     if (prev.find(o => o._id === order._id)) return prev;
-                    playNotificationSound();
+                    if (['pending', 'preparing', 'accepted'].includes(order.orderStatus?.toLowerCase())) {
+                        playNotificationSound();
+                    }
                     return [order, ...prev];
                 });
             };
 
             const onUpdateOrder = (order) => {
+                // Defensive check
+                if (!order || !order.orderStatus) return;
+
                 setOrders(prev => {
-                    const exists = prev.find(o => o._id === order._id);
-                    if (exists) {
+                    const existing = prev.find(o => o._id === order._id);
+                    if (existing) {
+                        // Play sound ONLY if it's a preparation order AND new items were added
+                        const oldItems = existing.items?.length || 0;
+                        const newItems = order.items?.length || 0;
+                        const status = order.orderStatus?.toLowerCase();
+                        if (newItems > oldItems && ['pending', 'preparing', 'accepted'].includes(status)) {
+                            playNotificationSound();
+                        }
                         return prev.map(o => o._id === order._id ? order : o);
                     } else {
+                        // Play sound ONLY if it's a new preparation order coming into view
+                        const status = order.orderStatus?.toLowerCase();
+                        if (['pending', 'preparing', 'accepted'].includes(status)) {
+                            playNotificationSound();
+                        }
                         return [order, ...prev];
                     }
                 });
@@ -470,6 +490,7 @@ const KitchenDashboard = () => {
             };
 
             const onCancelled = (order) => {
+                if (!order) return;
                 setOrders(prev => prev.map(o => o._id === order._id ? order : o));
                 if (detailsModal.isOpen && detailsModal.order?._id === order._id) {
                     setDetailsModal({ isOpen: false, order: null });
@@ -481,6 +502,7 @@ const KitchenDashboard = () => {
             socket.on('order-completed', onUpdateOrder);
             socket.on('orderCancelled', onCancelled);
             socket.on('itemUpdated', onUpdateOrder);
+            socket.on('productUpdated', onUpdateOrder);
 
             return () => {
                 socket.off('new-order', onNewOrder);
@@ -488,6 +510,7 @@ const KitchenDashboard = () => {
                 socket.off('order-completed', onUpdateOrder);
                 socket.off('orderCancelled', onCancelled);
                 socket.off('itemUpdated', onUpdateOrder);
+                socket.off('productUpdated', onUpdateOrder);
             };
         }
         window.addEventListener('pos-refresh', fetchOrders);

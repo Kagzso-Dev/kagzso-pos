@@ -462,9 +462,9 @@ const DineIn = () => {
                     {/* Cart Side Panel — Optimized Tablet Width */}
                     <aside 
                         className={`fixed inset-y-0 right-0 z-[100] md:relative md:z-0 md:flex flex-col border-l border-[var(--theme-border)] bg-[var(--theme-bg-card)] shadow-2xl transition-all duration-300 transform
-                            ${(isCartOpen && cart.length > 0) ? 'w-[85vw] sm:w-[50vw] md:w-[320px] lg:w-[380px] xl:w-[420px] translate-x-0' : 'w-0 translate-x-full md:translate-x-0 md:w-0 overflow-hidden opacity-0'}`}
+                            ${isCartOpen ? 'w-[85vw] sm:w-[50vw] md:w-[320px] lg:w-[380px] xl:w-[420px] translate-x-0' : 'w-0 translate-x-full md:translate-x-0 md:w-0 overflow-hidden opacity-0'}`}
                     >
-                        {(isCartOpen && cart.length > 0) && <div onClick={() => setIsCartOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" />}
+                        {isCartOpen && <div onClick={() => setIsCartOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" />}
 
                         <div className="relative h-full w-full bg-[var(--theme-bg-card)] flex flex-col overflow-hidden">
                             {/* Header */}
@@ -493,13 +493,16 @@ const DineIn = () => {
                             {/* Scrollable items / Empty State */}
                             <div className="flex-1 kot-scroll min-h-0 flex flex-col">
                                 {cart.length === 0 && (!isAddingItems || existingItems.length === 0) ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center text-center p-10 animate-fade-in">
-                                        <div className="w-24 h-24 rounded-full bg-[var(--theme-bg-dark)] flex items-center justify-center mb-6 border border-[var(--theme-border)] shadow-inner">
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center p-10 animate-fade-in bg-[var(--theme-bg-deep)]/30 m-4 rounded-[2rem] border-2 border-dashed border-[var(--theme-border)]">
+                                        <div className="w-24 h-24 rounded-full bg-[var(--theme-bg-dark)] flex items-center justify-center mb-6 border border-[var(--theme-border)] shadow-xl relative">
                                             <ShoppingCart size={32} className="text-[var(--theme-text-muted)] opacity-20" />
+                                            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-lg">
+                                                <Plus size={16} strokeWidth={3} />
+                                            </div>
                                         </div>
-                                        <h3 className="text-lg font-black text-[var(--theme-text-main)] uppercase tracking-tight mb-2">Your cart is empty</h3>
+                                        <h3 className="text-lg font-black text-[var(--theme-text-main)] uppercase tracking-tight mb-2">Cart is empty</h3>
                                         <p className="text-xs text-[var(--theme-text-muted)] max-w-[200px] font-bold leading-relaxed opacity-60">
-                                            Add some delicious items from the menu to start your order
+                                            Select delicious items from the menu to build your order.
                                         </p>
                                     </div>
                                 ) : (
@@ -651,7 +654,7 @@ const DineIn = () => {
             )}
 
             {/* ── Mobile Floating Cart Bar ── */}
-            {step === 3 && cart.length > 0 && !isCartOpen && (
+            {step === 3 && !isCartOpen && (
                 <div className="md:hidden fixed bottom-6 left-4 right-4 z-[90] animate-in slide-in-from-bottom-10 fade-in duration-500">
                     <button
                         onClick={() => setIsCartOpen(true)}

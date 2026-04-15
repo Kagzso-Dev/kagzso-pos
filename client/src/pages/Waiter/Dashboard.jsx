@@ -353,9 +353,32 @@ const WaiterDashboard = () => {
     useEffect(() => {
         if (user) fetchOrders();
         if (socket) {
-            const onNew = (o) => setOrders(p => { if (p.find(x => x._id === o._id)) return p; return [o, ...p]; });
+            const announceOrderReady = (order) => {
+                if (order.orderStatus === 'ready' && order.orderType === 'dine-in') {
+                    const tableNumber = order.tableId?.number || order.tableId || '?';
+                    const text = `Ready order, Dine In table number ${tableNumber}`;
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1;
+                    window.speechSynthesis.speak(utterance);
+                }
+            };
+
+            const onNew = (o) => setOrders(p => { 
+                if (p.find(x => x._id === o._id)) return p; 
+                if (o.orderStatus === 'ready') announceOrderReady(o);
+                return [o, ...p]; 
+            });
+
             const onUpdate = (o) => {
-                setOrders(p => { const exists = p.find(x => x._id === o._id); return exists ? p.map(x => x._id === o._id ? o : x) : [o, ...p]; });
+                setOrders(p => { 
+                    const existing = p.find(x => x._id === o._id); 
+                    // Voice announcement if order becomes READY
+                    if (o.orderStatus === 'ready' && (!existing || existing.orderStatus !== 'ready')) {
+                        announceOrderReady(o);
+                    }
+                    return existing ? p.map(x => x._id === o._id ? o : x) : [o, ...p]; 
+                });
                 if (selectedOrder?._id === o._id) {
                     if (o.paymentStatus === 'paid' || o.orderStatus === 'cancelled') setSelectedOrder(null);
                     else setSelectedOrder(o);
@@ -377,6 +400,15 @@ const WaiterDashboard = () => {
         window.addEventListener('pos-refresh', fetchOrders);
         return () => window.removeEventListener('pos-refresh', fetchOrders);
     }, [user, socket, fetchOrders, selectedOrder]);
+
+    // Auto-refresh every 10 seconds to keep the dashboard in sync
+    useEffect(() => {
+        if (!user) return;
+        const interval = setInterval(() => {
+            fetchOrders();
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [user, fetchOrders]);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);

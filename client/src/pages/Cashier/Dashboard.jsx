@@ -366,11 +366,28 @@ const CashierDashboard = () => {
                 }
             };
 
+            const announcePaymentReady = (order) => {
+                const isDineIn = order.orderType === 'dine-in';
+                const idLabel = isDineIn 
+                    ? `table number ${order.tableId?.number || order.tableId || '?'}`
+                    : `token number ${order.tokenNumber || '?'}`;
+                const text = `Payment ready... ${idLabel}`;
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                window.speechSynthesis.speak(utterance);
+            };
+
             const onNewOrder = (order) => {
                 const alreadyExists = prev => prev.find(o => o._id === order._id);
                 
-                // Play sound for all incoming orders
+                // Play bell for all incoming orders (5s loop)
                 playNotificationSound();
+                
+                // Also announce if it's already in payment status
+                if (order.orderStatus === 'payment') {
+                    announcePaymentReady(order);
+                }
 
                 if (isHistoryMode) {
                     if ((order.paymentStatus === 'paid' || order.orderStatus === 'cancelled')) {
@@ -382,24 +399,28 @@ const CashierDashboard = () => {
             };
 
             const onOrderUpdate = (order) => {
+                // Determine if this order just entered the 'payment' phase
                 setOrders(prev => {
                     const exists = prev.find(o => o._id === order._id);
+                    const becomesPayment = order.orderStatus === 'payment' && !exists;
+                    
+                    if (becomesPayment) {
+                        playNotificationSound();
+                        announcePaymentReady(order);
+                    }
+
                     if (isHistoryMode) {
-                        // In history, if it's now paid/cancelled, ensure it's in list.
                         if (order.paymentStatus === 'paid' || order.orderStatus === 'cancelled') {
                             return exists ? prev.map(o => o._id === order._id ? order : o) : [order, ...prev];
                         } else {
                             return prev.filter(o => o._id !== order._id);
                         }
                     } else {
-                        // In POS, only show orders that are in 'payment' stage.
-                        // If it's paid, cancelled, or still in another kitchen status, remove it from list.
+                        // POS Mode: Only track 'payment' status
                         if (order.orderStatus !== 'payment') {
                             return prev.filter(o => o._id !== order._id);
                         }
-                        // Update existing order (or add if it just reached payment status)
-                        if (exists) return prev.map(o => o._id === order._id ? order : o);
-                        return [order, ...prev];
+                        return exists ? prev.map(o => o._id === order._id ? order : o) : [order, ...prev];
                     }
                 });
                 // Keep selected order in sync or deselect if closed
@@ -414,17 +435,21 @@ const CashierDashboard = () => {
             socket.on('order-updated', onOrderUpdate);
             socket.on('order-completed', onOrderUpdate);
             socket.on('orderCancelled', onOrderUpdate);
+            socket.on('itemUpdated', onOrderUpdate);
+            socket.on('productUpdated', onOrderUpdate); // Add this for sync
 
             return () => {
                 socket.off('new-order', onNewOrder);
                 socket.off('order-updated', onOrderUpdate);
                 socket.off('order-completed', onOrderUpdate);
                 socket.off('orderCancelled', onOrderUpdate);
+                socket.off('itemUpdated', onOrderUpdate);
+                socket.off('productUpdated', onOrderUpdate);
             };
         }
         window.addEventListener('pos-refresh', fetchOrders);
         return () => window.removeEventListener('pos-refresh', fetchOrders);
-    }, [user, socket, fetchOrders]);
+    }, [user, socket, fetchOrders, isHistoryMode]);
 
     /* ── Select Order ────────────────────────────────────────────────── */
     const handleSelect = (order) => {

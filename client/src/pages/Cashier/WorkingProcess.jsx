@@ -54,21 +54,43 @@ const WorkingProcess = () => {
 
         const onNewOrder = (newOrder) => {
             setOrders(prev => {
-                if (prev.find(o => o._id === newOrder._id)) return prev;
-                playNotificationSound();
+                const alreadyExists = prev.find(o => o._id === newOrder._id);
+                if (alreadyExists) return prev;
+                
+                // Only sound bell for new preparation tasks
+                if (['pending', 'preparing', 'accepted'].includes(newOrder.orderStatus)) {
+                    playNotificationSound();
+                }
                 return [newOrder, ...prev];
             });
         };
 
         const onOrderUpdated = (updatedOrder) => {
-            const isDone = ['completed', 'cancelled'].includes(updatedOrder.orderStatus);
+            if (!updatedOrder) return;
+            const status = updatedOrder.orderStatus?.toLowerCase();
+            const isDone = ['completed', 'cancelled', 'payment'].includes(status);
+            
             setOrders(prev => {
                 const existing = prev.find(o => o._id === updatedOrder._id);
                 if (isDone) return prev.filter(o => o._id !== updatedOrder._id);
-                if (existing) return prev.map(o => o._id === updatedOrder._id ? updatedOrder : o);
+                
+                if (existing) {
+                    // Play sound ONLY if new items added to an active prep order
+                    const oldItems = existing.items?.length || 0;
+                    const newItems = updatedOrder.items?.length || 0;
+                    if (newItems > oldItems && ['pending', 'preparing', 'accepted'].includes(status)) {
+                        playNotificationSound();
+                    }
+                    return prev.map(o => o._id === updatedOrder._id ? updatedOrder : o);
+                }
+                
+                // New prep order coming into range
+                if (['pending', 'preparing', 'accepted'].includes(status)) {
+                    playNotificationSound();
+                }
                 return [updatedOrder, ...prev];
             });
-            // Update selectedOrder without needing it in deps — compare by id at call time
+
             setSelectedOrder(prev => {
                 if (!prev || prev._id !== updatedOrder._id) return prev;
                 return isDone ? null : updatedOrder;
