@@ -11,7 +11,7 @@ const AdminCategories = () => {
     const [categories, setCategories] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
-    const [formData, setFormData] = useState({ name: '', description: '', color: '#3b82f6', status: 'active', image: '' });
+    const [formData, setFormData] = useState({ name: '', description: '', color: '#3b82f6', is_active: true, image: '' });
     const [formError, setFormError] = useState('');
     const [imageUploading, setImageUploading] = useState(false);
     const imageFileRef = useRef(null);
@@ -118,16 +118,20 @@ const AdminCategories = () => {
     };
 
     const handleToggleStatus = async (cat) => {
-        const newStatus = cat.status === 'active' ? 'inactive' : 'active';
+        const newState = !cat.is_active;
+        if (!newState) {
+            const confirmed = window.confirm("Disabling this category will hide it and all its items from the POS menu. Proceed?");
+            if (!confirmed) return;
+        }
         try {
             if (!navigator.onLine) {
-                const action = { type: 'category', method: 'PUT', endpoint: `/api/categories/${cat._id}`, data: { status: newStatus } };
+                const action = { type: 'category', method: 'PUT', endpoint: `/api/categories/${cat._id}`, data: { is_active: newState } };
                 await queueAction(action);
-                setCategories(prev => prev.map(c => c._id === cat._id ? { ...c, status: newStatus } : c));
+                setCategories(prev => prev.map(c => c._id === cat._id ? { ...c, is_active: newState } : c));
                 alert('Status will be updated when online.');
                 return;
             }
-            await api.put(`/api/categories/${cat._id}`, { status: newStatus }, {
+            await api.put(`/api/categories/${cat._id}`, { is_active: newState }, {
                 headers: { Authorization: `Bearer ${user.token}` },
             });
         } catch (error) {
@@ -182,12 +186,12 @@ const AdminCategories = () => {
                 name: category.name,
                 description: category.description || '',
                 color: category.color || '#3b82f6',
-                status: category.status || 'active',
+                is_active: category.is_active !== false,
                 image: category.image || '',
             });
         } else {
             setEditingCategory(null);
-            setFormData({ name: '', description: '', color: '#3b82f6', status: 'active', image: '' });
+            setFormData({ name: '', description: '', color: '#3b82f6', is_active: true, image: '' });
         }
         setIsModalOpen(true);
     };
@@ -198,8 +202,8 @@ const AdminCategories = () => {
         setFormError('');
     };
 
-    const active = categories.filter(c => c.status === 'active');
-    const inactive = categories.filter(c => c.status === 'inactive');
+    const active = categories.filter(c => c.is_active !== false);
+    const inactive = categories.filter(c => c.is_active === false);
 
     return (
         <div className="space-y-6">
@@ -253,9 +257,9 @@ const AdminCategories = () => {
                                 <div className="flex items-center gap-4">
                                     <button
                                         onClick={() => handleToggleStatus(cat)}
-                                        className={`px-2 py-0.5 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${cat.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}
+                                        className={`px-2 py-0.5 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${cat.is_active !== false ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}
                                     >
-                                        {cat.status}
+                                        {cat.is_active !== false ? 'active' : 'inactive'}
                                     </button>
                                     <div className="flex gap-1">
                                         <button onClick={() => openModal(cat)} className="p-2 text-[var(--theme-text-muted)] hover:text-blue-400"><Edit2 size={16} /></button>
@@ -286,8 +290,8 @@ const AdminCategories = () => {
                                 <div className="flex justify-between items-center mt-1">
                                     <button
                                         onClick={() => handleToggleStatus(cat)}
-                                        className={`w-2 h-2 rounded-full ${cat.status === 'active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500'}`}
-                                        title={cat.status}
+                                        className={`w-2 h-2 rounded-full ${cat.is_active !== false ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500'}`}
+                                        title={cat.is_active !== false ? 'active' : 'inactive'}
                                     />
                                     <span className="text-[10px] font-mono opacity-20">#{cat._id.slice(-4).toUpperCase()}</span>
                                 </div>
@@ -339,14 +343,14 @@ const AdminCategories = () => {
                                     <button
                                         onClick={() => handleToggleStatus(cat)}
                                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all shadow-sm whitespace-nowrap ${
-                                            cat.status === 'active'
+                                            cat.is_active !== false
                                                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
                                                 : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                                         }`}
-                                        title={cat.status === 'active' ? 'Click to deactivate' : 'Click to activate'}
+                                        title={cat.is_active !== false ? 'Click to deactivate' : 'Click to activate'}
                                     >
-                                        <div className={`w-1 h-1 rounded-full ${cat.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                                        {cat.status}
+                                        <div className={`w-1 h-1 rounded-full ${cat.is_active !== false ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                                        {cat.is_active !== false ? 'active' : 'inactive'}
                                     </button>
 
                                     <span className="text-[10px] text-[var(--theme-text-subtle)] font-bold font-mono opacity-50">
@@ -489,16 +493,16 @@ const AdminCategories = () => {
                                     <div className="flex gap-2.5">
                                         <button
                                             type="button"
-                                            onClick={() => setFormData({ ...formData, status: 'active' })}
-                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-1.5 ${formData.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] border-[var(--theme-border)]'}`}
+                                            onClick={() => setFormData({ ...formData, is_active: true })}
+                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-1.5 ${formData.is_active !== false ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] border-[var(--theme-border)]'}`}
                                         >
                                             <div className="w-1 h-1 rounded-full bg-current" />
                                             Active
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setFormData({ ...formData, status: 'inactive' })}
-                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-1.5 ${formData.status === 'inactive' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] border-[var(--theme-border)]'}`}
+                                            onClick={() => setFormData({ ...formData, is_active: false })}
+                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-1.5 ${formData.is_active === false ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-[var(--theme-bg-dark)] text-[var(--theme-text-muted)] border-[var(--theme-border)]'}`}
                                         >
                                             <div className="w-1 h-1 rounded-full bg-current" />
                                             Inactive

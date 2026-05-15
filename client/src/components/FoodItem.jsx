@@ -64,6 +64,7 @@ const FoodItem = memo(({
         : null;
 
     const isVeg = item.isVeg;
+    const isInactive = item.is_active === false;
 
     /* ── LIST VIEW ──────────────────────────────────────────────────────── */
     if (viewMode === 'list') {
@@ -71,8 +72,8 @@ const FoodItem = memo(({
 
         return (
             <div
-                className={`group bg-[var(--theme-bg-card)] rounded-xl overflow-hidden border transition-all animate-fade-in ${cartQty > 0 ? 'border-orange-500/50 shadow-md ring-1 ring-orange-500/10' : 'border-[var(--theme-border)] hover:border-gray-400/20'} ${!isAdmin && item.availability !== false ? 'cursor-pointer active:scale-[0.99]' : ''}`}
-                onClick={() => !isAdmin && item.availability !== false && !item.variants?.length && onAdd(item)}
+                className={`group bg-[var(--theme-bg-card)] rounded-xl overflow-hidden border transition-all animate-fade-in ${cartQty > 0 ? 'border-orange-500/50 shadow-md ring-1 ring-orange-500/10' : 'border-[var(--theme-border)] hover:border-gray-400/20'} ${(!isAdmin && (item.availability === false || isInactive)) ? 'opacity-60 grayscale-[0.5]' : 'cursor-pointer active:scale-[0.99]'}`}
+                onClick={() => !isAdmin && item.availability !== false && !isInactive && !item.variants?.length && onAdd(item)}
             >
                 <div className="flex items-center gap-3 p-2 sm:p-3">
                     <OptimizedImage
@@ -84,6 +85,11 @@ const FoodItem = memo(({
                         {item.availability === false && (
                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                 <span className="text-white text-[8px] font-black uppercase tracking-tight">Off</span>
+                            </div>
+                        )}
+                        {isInactive && (
+                            <div className="absolute top-1 left-1 bg-gray-900/80 text-white text-[6px] font-black uppercase tracking-widest px-1 rounded-sm border border-white/5">
+                                Hidden
                             </div>
                         )}
                     </OptimizedImage>
@@ -167,8 +173,8 @@ const FoodItem = memo(({
 
     return (
         <div
-            className={`group relative bg-[var(--theme-bg-card)] rounded-2xl border transition-all flex flex-col animate-fade-in overflow-hidden ${cartQty > 0 ? 'border-orange-500/40 shadow-md ring-1 ring-orange-500/10' : 'border-[var(--theme-border)] hover:border-orange-500/20 active:scale-[0.99]'} ${!isAdmin && item.availability !== false ? 'cursor-pointer' : ''}`}
-            onClick={() => !isAdmin && item.availability !== false && onAdd(item, selectedSize)}
+            className={`group relative bg-[var(--theme-bg-card)] rounded-2xl border transition-all flex flex-col animate-fade-in overflow-hidden ${cartQty > 0 ? 'border-orange-500/40 shadow-md ring-1 ring-orange-500/10' : 'border-[var(--theme-border)] hover:border-orange-500/20 active:scale-[0.99]'} ${(!isAdmin && (item.availability === false || isInactive)) ? 'opacity-60 grayscale-[0.5]' : 'cursor-pointer'}`}
+            onClick={() => !isAdmin && item.availability !== false && !isInactive && onAdd(item, selectedSize)}
         >
             <div className="relative aspect-[4/3] overflow-hidden">
                 <OptimizedImage
@@ -184,6 +190,12 @@ const FoodItem = memo(({
                         <div className={`w-1.5 h-1.5 rounded-full ${isVeg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                         <span className="text-[8px] font-black text-white/90 tracking-tighter uppercase">{isVeg ? 'Veg' : 'Non'}</span>
                     </div>
+                    {isInactive && (
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-900/90 backdrop-blur-md border border-white/5 shadow-lg">
+                            <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_5px_rgba(244,63,94,0.8)]" />
+                            <span className="text-[7px] font-black text-white/90 tracking-widest uppercase">Hidden</span>
+                        </div>
+                    )}
                 </div>
 
                 {item.variants?.length > 0 && !isAdmin && (

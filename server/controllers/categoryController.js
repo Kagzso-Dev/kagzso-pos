@@ -6,7 +6,9 @@ const { invalidateCache } = require('../utils/cache');
 // @access  Private
 const getCategories = async (req, res) => {
     try {
-        const categories = await Category.findAll();
+        const categories = req.role === 'admin'
+            ? await Category.findAll()
+            : await Category.findActive();
         console.log(`[API] Categories fetched: ${categories.length} items`);
         res.json(categories);
     } catch (error) {

@@ -9,10 +9,11 @@ const fmt = (row, catDoc = null) => {
         description: row.description,
         price: parseFloat(row.price),
         category: catDoc 
-            ? { _id: catDoc.id, name: catDoc.name, color: catDoc.color, status: catDoc.status }
+            ? { _id: catDoc.id, name: catDoc.name, color: catDoc.color, status: catDoc.status, is_active: catDoc.is_active === 1 }
             : row.category_id,
         image: row.image,
         availability: row.availability === 1,
+        is_active: row.is_active === 1,
         isVeg: row.is_veg === 1,
         variants: row.variants ? (typeof row.variants === 'string' ? JSON.parse(row.variants) : row.variants) : [],
         createdAt: row.created_at,
@@ -32,7 +33,16 @@ const MenuItem = {
     },
 
     async findAvailable() {
-        const [itemsResp] = await mysql.query('SELECT * FROM menu_items WHERE availability = 1 ORDER BY name ASC');
+        const query = `
+            SELECT m.* 
+            FROM menu_items m
+            JOIN categories c ON m.category_id = c.id
+            WHERE m.is_active = 1 
+              AND m.availability = 1
+              AND c.is_active = 1
+            ORDER BY m.name ASC
+        `;
+        const [itemsResp] = await mysql.query(query);
         const [catsResp] = await mysql.query('SELECT * FROM categories');
         
         const catMap = {};
@@ -58,11 +68,11 @@ const MenuItem = {
         }
     },
 
-    async create({ name, description, price, category, image, isVeg, availability, variants }) {
+    async create({ name, description, price, category, image, isVeg, availability, is_active, variants }) {
         const id = crypto.randomUUID();
         await mysql.query(
-            'INSERT INTO menu_items (id, name, description, price, category_id, image, availability, is_veg, variants) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, name, description || null, parseFloat(price), category, image || null, availability !== false ? 1 : 0, isVeg !== false ? 1 : 0, variants?.length ? JSON.stringify(variants) : null]
+            'INSERT INTO menu_items (id, name, description, price, category_id, image, availability, is_active, is_veg, variants) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, name, description || null, parseFloat(price), category, image || null, availability !== false ? 1 : 0, is_active !== false ? 1 : 0, isVeg !== false ? 1 : 0, variants?.length ? JSON.stringify(variants) : null]
         );
         return this.findById(id);
     },
@@ -75,6 +85,7 @@ const MenuItem = {
             category: 'category_id',
             image: 'image',
             availability: 'availability',
+            is_active: 'is_active',
             isVeg: 'is_veg',
             variants: 'variants',
         };
@@ -88,7 +99,7 @@ const MenuItem = {
                     updateValues.push(parseFloat(val));
                 } else if (key === 'variants' && val !== undefined) {
                     updateValues.push(val?.length ? JSON.stringify(val) : null);
-                } else if (key === 'availability' || key === 'isVeg') {
+                } else if (key === 'availability' || key === 'isVeg' || key === 'is_active') {
                     updateValues.push(val ? 1 : 0);
                 } else {
                     updateValues.push(val);

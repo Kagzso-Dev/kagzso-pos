@@ -116,6 +116,21 @@ const createOrder = async (req, res) => {
                 });
             }
         }
+        
+        // --- BATCH VALIDATION ---
+        const menuItems = await Promise.all(items.map(i => MenuItem.findById(i.menuItemId)));
+        for (let i = 0; i < items.length; i++) {
+            const mi = menuItems[i];
+            if (!mi) {
+                return res.status(400).json({ message: `Item "${items[i].name}" not found` });
+            }
+            if (!mi.availability || !mi.is_active) {
+                return res.status(400).json({ success: false, message: `Item "${mi.name}" is currently unavailable` });
+            }
+            if (!mi.category?.is_active) {
+                return res.status(400).json({ success: false, message: `Category for "${mi.name}" is currently inactive` });
+            }
+        }
 
         // Force recalculation based on admin settings (on discounted subtotal)
         const sRate = (settings.sgst || 0) / 100;
@@ -688,6 +703,21 @@ const addOrderItems = async (req, res) => {
         
         if (['completed', 'cancelled'].includes(order.orderStatus)) {
             return res.status(400).json({ message: `Cannot add items to ${order.orderStatus} order` });
+        }
+
+        // --- BATCH VALIDATION ---
+        const menuItems = await Promise.all(items.map(i => MenuItem.findById(i.menuItemId)));
+        for (let i = 0; i < items.length; i++) {
+            const mi = menuItems[i];
+            if (!mi) {
+                return res.status(400).json({ message: `Item "${items[i].name}" not found` });
+            }
+            if (!mi.availability || !mi.is_active) {
+                return res.status(400).json({ success: false, message: `Item "${mi.name}" is currently unavailable` });
+            }
+            if (!mi.category?.is_active) {
+                return res.status(400).json({ success: false, message: `Category for "${mi.name}" is currently inactive` });
+            }
         }
 
         const updatedOrder = await Order.addItems(id, items, { totalAmount, sgst, cgst, finalAmount });
