@@ -134,7 +134,7 @@ const useMenuData = () => {
                 const processed = applyDefaultImages([item])[0];
                 setMenuItems(prev => {
                     let next;
-                    if (!item.availability) {
+                    if (!item.availability || item.is_active === false) {
                         next = prev.filter(i => i._id !== item._id);
                     } else {
                         next = prev.map(i => (i._id === item._id ? processed : i));
@@ -163,14 +163,30 @@ const useMenuData = () => {
                     return next;
                 });
             } else if (action === 'update' && category) {
-                setCategories(prev => {
-                    const next = prev.map(c =>
-                        c._id === category._id ? category : c
-                    );
-                    _cache.categories = next;
-                    saveCategories(next);
-                    return next;
-                });
+                if (category.is_active === false) {
+                    // Remove category and all its items
+                    setCategories(prev => {
+                        const next = prev.filter(c => c._id !== category._id);
+                        _cache.categories = next;
+                        saveCategories(next);
+                        return next;
+                    });
+                    setMenuItems(prev => {
+                        const next = prev.filter(i => i.category?._id !== category._id);
+                        _cache.items = next;
+                        saveMenus(next);
+                        return next;
+                    });
+                } else {
+                    setCategories(prev => {
+                        const next = prev.map(c =>
+                            c._id === category._id ? category : c
+                        );
+                        _cache.categories = next;
+                        saveCategories(next);
+                        return next;
+                    });
+                }
             } else if (action === 'delete' && id) {
                 setCategories(prev => {
                     const next = prev.filter(c => c._id !== id);
