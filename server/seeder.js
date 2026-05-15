@@ -52,6 +52,7 @@ const createTables = async () => {
             description TEXT,
             color VARCHAR(7),
             status VARCHAR(50) DEFAULT 'active',
+            is_active BOOLEAN DEFAULT 1,
             image TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -64,6 +65,7 @@ const createTables = async () => {
             category_id VARCHAR(36),
             image TEXT,
             availability BOOLEAN DEFAULT 1,
+            is_active BOOLEAN DEFAULT 1,
             is_veg BOOLEAN DEFAULT 0,
             variants JSON,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -272,7 +274,7 @@ const importData = async () => {
         for (const c of categoriesData) {
             const cid = crypto.randomUUID();
             await mysql.query(
-                'INSERT INTO categories (id, name, description, image, color, status) VALUES (?, ?, ?, ?, ?, "active")',
+                'INSERT INTO categories (id, name, description, image, color, status, is_active) VALUES (?, ?, ?, ?, ?, "active", 1)',
                 [cid, c.name, c.description, c.image, c.color]
             );
             catMap[c.name] = cid;
@@ -325,7 +327,7 @@ const importData = async () => {
         for (const item of items) {
             const mid = crypto.randomUUID();
             await mysql.query(
-                'INSERT INTO menu_items (id, name, price, category_id, image, is_veg, availability) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO menu_items (id, name, price, category_id, image, is_veg, availability, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
                 [mid, item.name, parseFloat(item.price), catMap[item.cat], `/images/items/${item.img}`, item.veg, 1]
             );
         }

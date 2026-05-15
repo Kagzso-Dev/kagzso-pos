@@ -8,6 +8,7 @@ const fmt = (row) => row ? {
     color:       row.color,
     status:      row.status,
     image:       row.image || null,
+    is_active:   row.is_active === 1,
     createdAt:   row.created_at,
     updatedAt:   row.updated_at,
 } : null;
@@ -20,7 +21,7 @@ const Category = {
     },
 
     async findActive() {
-        const [rows] = await mysql.query('SELECT * FROM categories WHERE status = "active" ORDER BY name ASC');
+        const [rows] = await mysql.query('SELECT * FROM categories WHERE is_active = 1 ORDER BY name ASC');
         return rows.map(fmt);
     },
 
@@ -33,17 +34,17 @@ const Category = {
         }
     },
 
-    async create({ name, description, color, image }) {
+    async create({ name, description, color, image, is_active }) {
         const id = crypto.randomUUID();
         await mysql.query(
-            'INSERT INTO categories (id, name, description, color, image, status) VALUES (?, ?, ?, ?, ?, "active")',
-            [id, name, description || null, color || '#f97316', image || null]
+            'INSERT INTO categories (id, name, description, color, image, is_active, status) VALUES (?, ?, ?, ?, ?, ?, "active")',
+            [id, name, description || null, color || '#f97316', image || null, is_active !== false ? 1 : 0]
         );
         return this.findById(id);
     },
 
     async updateById(id, updates) {
-        const allowed = ['name', 'description', 'color', 'status', 'image'];
+        const allowed = ['name', 'description', 'color', 'status', 'image', 'is_active'];
         const updateKeys = [];
         const updateValues = [];
 
